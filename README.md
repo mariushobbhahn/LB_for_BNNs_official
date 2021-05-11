@@ -1,6 +1,6 @@
 # LB_for_BNNs
 
-This is the official github repository for the paper "Fast Predictive Uncertainty For Classification Bayesian Deep Networks" by me (Marius Hobbhahn), Agustinus Kristiadi and Philipp Hennig. The paper can be found on arxiv at: https://arxiv.org/abs/2003.01227
+This is the official github repository for the paper "Fast Predictive Uncertainty For Classification Bayesian Deep Networks" by me (Marius Hobbhahn), Agustinus Kristiadi and Philipp Hennig. The paper can be found on arxiv at: https://arxiv.org/abs/2003.01227. I have also writen a <a href='https://www.mariushobbhahn.com/2020-11-03-LB_for_BNNs/'>blog post</a>, which is an easy-to-understand summary of the paper.
 
 All files are supposed to be stand-alone notebooks so you can look at different experiments independent of each other.
 
