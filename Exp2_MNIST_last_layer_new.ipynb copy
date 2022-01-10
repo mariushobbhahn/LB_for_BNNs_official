@@ -1,0 +1,1599 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#!nvidia-smi\n",
+    "#using a GeForce GTX1080 Ti for reproducibility for all timing experiments"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import torch\n",
+    "import torchvision\n",
+    "from torch import nn, optim, autograd\n",
+    "from torch.nn import functional as F\n",
+    "import numpy as np\n",
+    "from sklearn.metrics import roc_auc_score\n",
+    "import scipy\n",
+    "from utils.LB_utils import * \n",
+    "from utils.load_not_MNIST import notMNIST\n",
+    "import os\n",
+    "import time\n",
+    "import matplotlib.pyplot as plt\n",
+    "from laplace import Laplace\n",
+    "\n",
+    "s = 1\n",
+    "np.random.seed(s)\n",
+    "torch.manual_seed(s)\n",
+    "torch.cuda.manual_seed(s)\n",
+    "torch.backends.cudnn.deterministic = True\n",
+    "torch.backends.cudnn.benchmark = False"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "device:  cpu\n",
+      "cuda status:  False\n"
+     ]
+    }
+   ],
+   "source": [
+    "device = 'cuda' if torch.cuda.is_available() else 'cpu'\n",
+    "cuda_status = torch.cuda.is_available()\n",
+    "print(\"device: \", device)\n",
+    "print(\"cuda status: \", cuda_status)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "### define network\n",
+    "class ConvNet(nn.Module):\n",
+    "    \n",
+    "    def __init__(self, num_classes=10):\n",
+    "        super(ConvNet, self).__init__()\n",
+    "        \n",
+    "        self.net = torch.nn.Sequential(\n",
+    "            torch.nn.Conv2d(1, 16, 5),\n",
+    "            torch.nn.ReLU(),\n",
+    "            torch.nn.MaxPool2d(2,2),\n",
+    "            torch.nn.Conv2d(16, 32, 5),\n",
+    "            torch.nn.ReLU(),\n",
+    "            torch.nn.MaxPool2d(2,2),\n",
+    "            torch.nn.Flatten(),\n",
+    "            torch.nn.Linear(4 * 4 * 32, num_classes)\n",
+    "        )\n",
+    "    def forward(self, x):\n",
+    "        out = self.net(x)\n",
+    "        return out"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "BATCH_SIZE_TRAIN_MNIST = 128\n",
+    "BATCH_SIZE_TEST_MNIST = 128\n",
+    "MAX_ITER_MNIST = 6\n",
+    "LR_TRAIN_MNIST = 10e-6"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "MNIST_transform = torchvision.transforms.ToTensor()\n",
+    "\n",
+    "MNIST_train = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=True,\n",
+    "        download=True,\n",
+    "        transform=MNIST_transform)\n",
+    "\n",
+    "MNIST_train_loader = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_train,\n",
+    "    batch_size=BATCH_SIZE_TRAIN_MNIST,\n",
+    "    shuffle=True\n",
+    ")\n",
+    "\n",
+    "\n",
+    "MNIST_test = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform)\n",
+    "\n",
+    "MNIST_test_loader = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mnist_model = ConvNet().to(device)\n",
+    "loss_function = torch.nn.CrossEntropyLoss()\n",
+    "\n",
+    "mnist_train_optimizer = torch.optim.Adam(mnist_model.parameters(), lr=1e-3, weight_decay=5e-4)\n",
+    "MNIST_PATH = \"pretrained_weights/MNIST_pretrained_10_classes_last_layer_s{}.pth\".format(s)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Training routine\n",
+    "\n",
+    "def train(model, train_loader, optimizer, max_iter, path, verbose=True):\n",
+    "    max_len = len(train_loader)\n",
+    "\n",
+    "    for iter in range(max_iter):\n",
+    "        for batch_idx, (x, y) in enumerate(train_loader):\n",
+    "            \n",
+    "            x, y = x.to(device), y.to(device)\n",
+    "            \n",
+    "            output = model(x)\n",
+    "\n",
+    "            accuracy = get_accuracy(output, y)\n",
+    "\n",
+    "            loss = loss_function(output, y)\n",
+    "            loss.backward()\n",
+    "            optimizer.step()\n",
+    "            optimizer.zero_grad()\n",
+    "\n",
+    "            if verbose and batch_idx % 50 == 0:\n",
+    "                print(\n",
+    "                    \"Iteration {}; {}/{} \\t\".format(iter, batch_idx, max_len) +\n",
+    "                    \"Minibatch Loss %.3f  \" % (loss) +\n",
+    "                    \"Accuracy %.0f\" % (accuracy * 100) + \"%\"\n",
+    "                )\n",
+    "\n",
+    "    print(\"saving model at: {}\".format(path))\n",
+    "    torch.save(mnist_model.state_dict(), path)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#train(mnist_model, MNIST_train_loader, mnist_train_optimizer, MAX_ITER_MNIST, MNIST_PATH, verbose=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "loading model from: pretrained_weights/MNIST_pretrained_10_classes_last_layer_s1.pth\n",
+      "Batch 0/79 \tAccuracy 100%\n",
+      "Batch 10/79 \tAccuracy 98%\n",
+      "Batch 20/79 \tAccuracy 98%\n",
+      "Batch 30/79 \tAccuracy 97%\n",
+      "Batch 40/79 \tAccuracy 100%\n",
+      "Batch 50/79 \tAccuracy 99%\n",
+      "Batch 60/79 \tAccuracy 100%\n",
+      "Batch 70/79 \tAccuracy 98%\n",
+      "overall test accuracy on MNIST: 98.84 %\n"
+     ]
+    }
+   ],
+   "source": [
+    "#predict in distribution\n",
+    "MNIST_PATH = \"pretrained_weights/MNIST_pretrained_10_classes_last_layer_s{}.pth\".format(s)\n",
+    "#MNIST_PATH = \"pretrained_weights/MNIST_pretrained_10_classes_last_layer.pth\"\n",
+    "\n",
+    "mnist_model = ConvNet().to(device)\n",
+    "print(\"loading model from: {}\".format(MNIST_PATH))\n",
+    "mnist_model.load_state_dict(torch.load(MNIST_PATH))\n",
+    "mnist_model.eval()\n",
+    "\n",
+    "acc = []\n",
+    "\n",
+    "max_len = len(MNIST_test_loader)\n",
+    "for batch_idx, (x, y) in enumerate(MNIST_test_loader):\n",
+    "\n",
+    "    x, y = x.to(device), y.to(device)\n",
+    "    output = mnist_model(x)\n",
+    "\n",
+    "    accuracy = get_accuracy(output, y)\n",
+    "    if batch_idx % 10 == 0:\n",
+    "        print(\n",
+    "            \"Batch {}/{} \\t\".format(batch_idx, max_len) + \n",
+    "            \"Accuracy %.0f\" % (accuracy * 100) + \"%\"\n",
+    "        )\n",
+    "    acc.append(accuracy)\n",
+    "\n",
+    "avg_acc = np.mean(acc)\n",
+    "print('overall test accuracy on MNIST: {:.02f} %'.format(avg_acc * 100))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "BATCH_SIZE_TEST_FMNIST = 128\n",
+    "BATCH_SIZE_TEST_KMNIST = 128"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "FMNIST_test = torchvision.datasets.FashionMNIST(\n",
+    "        '~/data/fmnist', train=False, download=True,\n",
+    "        transform=MNIST_transform)   #torchvision.transforms.ToTensor())\n",
+    "\n",
+    "FMNIST_test_loader = torch.utils.data.DataLoader(\n",
+    "    FMNIST_test,\n",
+    "    batch_size=BATCH_SIZE_TEST_FMNIST, shuffle=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "KMNIST_test = torchvision.datasets.KMNIST(\n",
+    "        '~/data/kmnist', train=False, download=True,\n",
+    "        transform=MNIST_transform)\n",
+    "\n",
+    "KMNIST_test_loader = torch.utils.data.DataLoader(\n",
+    "    KMNIST_test,\n",
+    "    batch_size=BATCH_SIZE_TEST_KMNIST, shuffle=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "File A/RGVtb2NyYXRpY2FCb2xkT2xkc3R5bGUgQm9sZC50dGY=.png is broken\n",
+      "File F/Q3Jvc3NvdmVyIEJvbGRPYmxpcXVlLnR0Zg==.png is broken\n"
+     ]
+    }
+   ],
+   "source": [
+    "#root = os.path.abspath('~/data')\n",
+    "root = os.path.expanduser('~/data')\n",
+    "\n",
+    "# Instantiating the notMNIST dataset class we created\n",
+    "notMNIST_test = notMNIST(root=os.path.join(root, 'notMNIST_small'),\n",
+    "                               transform=MNIST_transform)\n",
+    "\n",
+    "# Creating a dataloader\n",
+    "notMNIST_test_loader = torch.utils.data.dataloader.DataLoader(\n",
+    "                            dataset=notMNIST_test,\n",
+    "                            batch_size=BATCH_SIZE_TEST_KMNIST,\n",
+    "                            shuffle=False)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "TODO:\n",
+    "- check out the prob @ correct\n",
+    "- write script for experiments\n",
+    "- comment the jupyter notebook"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# MAP estimate"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "targets = MNIST_test.targets.numpy()\n",
+    "targets_FMNIST = FMNIST_test.targets.numpy()\n",
+    "targets_notMNIST = notMNIST_test.targets.numpy().astype(int)\n",
+    "targets_KMNIST = KMNIST_test.targets.numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "MNIST_test_in_MAP = predict_MAP(mnist_model, MNIST_test_loader, device=device).cpu().numpy()\n",
+    "MNIST_test_out_fmnist_MAP = predict_MAP(mnist_model, FMNIST_test_loader, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_MAP = predict_MAP(mnist_model, notMNIST_test_loader, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_MAP = predict_MAP(mnist_model, KMNIST_test_loader, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_MAP, prob_correct_in_MAP, ent_in_MAP, MMC_in_MAP = get_in_dist_values(MNIST_test_in_MAP, targets)\n",
+    "acc_out_FMNIST_MAP, prob_correct_out_FMNIST_MAP, ent_out_FMNIST_MAP, MMC_out_FMNIST_MAP, auroc_out_FMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_fmnist_MAP, targets_FMNIST)\n",
+    "acc_out_notMNIST_MAP, prob_correct_out_notMNIST_MAP, ent_out_notMNIST_MAP, MMC_out_notMNIST_MAP, auroc_out_notMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_notMNIST_MAP, targets_notMNIST)\n",
+    "acc_out_KMNIST_MAP, prob_correct_out_KMNIST_MAP, ent_out_KMNIST_MAP, MMC_out_KMNIST_MAP, auroc_out_KMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_KMNIST_MAP, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, MAP, MNIST] Accuracy: 0.988; average entropy: 0.048;     MMC: 0.986; Prob @ correct: 0.100\n",
+      "[Out-FMNIST, MAP, MNIST] Accuracy: 0.064; Average entropy: 1.014;    MMC: 0.648; AUROC: 0.979; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, MAP, MNIST] Accuracy: 0.151; Average entropy: 0.666;    MMC: 0.756; AUROC: 0.920; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, MAP, MNIST] Accuracy: 0.089; Average entropy: 0.769;    MMC: 0.716; AUROC: 0.961; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_MAP, prob_correct_in_MAP, ent_in_MAP, MMC_in_MAP, 'MNIST', 'MAP')\n",
+    "print_out_dist_values(acc_out_FMNIST_MAP, prob_correct_out_FMNIST_MAP, ent_out_FMNIST_MAP, MMC_out_FMNIST_MAP, auroc_out_FMNIST_MAP, 'MNIST', test='FMNIST', method='MAP')\n",
+    "print_out_dist_values(acc_out_notMNIST_MAP, prob_correct_out_notMNIST_MAP, ent_out_notMNIST_MAP, MMC_out_notMNIST_MAP, auroc_out_notMNIST_MAP, 'MNIST', test='notMNIST', method='MAP')\n",
+    "print_out_dist_values(acc_out_KMNIST_MAP, prob_correct_out_KMNIST_MAP, ent_out_KMNIST_MAP, MMC_out_KMNIST_MAP, auroc_out_KMNIST_MAP, 'MNIST', test='KMNIST', method='MAP')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "num_samples = 100"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Diag Hessian Sampling estimate"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "la_diag = Laplace(mnist_model, 'classification', \n",
+    "                     subset_of_weights='last_layer', \n",
+    "                     hessian_structure='diag',\n",
+    "                     prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay\n",
+    "la_diag.fit(MNIST_train_loader)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  4.1483029999999985\n",
+      "time:  4.237766000000001\n",
+      "time:  7.118707000000001\n",
+      "time:  4.111066000000001\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_D = predict_samples(la_diag, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_D = predict_samples(la_diag, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_D = predict_samples(la_diag, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_D = predict_samples(la_diag, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "tensor(-0.0610)\n",
+      "tensor(-3.9688)\n",
+      "tensor(-4.2493)\n",
+      "tensor(-4.9710)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# compute average log-likelihood for Diag\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_in_D)).log_prob(torch.tensor(targets)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_D)).log_prob(torch.tensor(targets_FMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_D)).log_prob(torch.tensor(targets_notMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_D)).log_prob(torch.tensor(targets_KMNIST)).mean())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import utils.scoring as scoring"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.034804131313131294\n",
+      "0.4634627373737375\n",
+      "0.3887188645696444\n",
+      "0.43278955555555565\n"
+     ]
+    }
+   ],
+   "source": [
+    "#compute the Expected confidence estimate\n",
+    "print(scoring.expected_calibration_error(targets, MNIST_test_in_D))\n",
+    "print(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_D))\n",
+    "print(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_D))\n",
+    "print(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_D))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_D, prob_correct_in_D, ent_in_D, MMC_in_D = get_in_dist_values(MNIST_test_in_D, targets)\n",
+    "acc_out_FMNIST_D, prob_correct_out_FMNIST_D, ent_out_FMNIST_D, MMC_out_FMNIST_D, auroc_out_FMNIST_D = get_out_dist_values(MNIST_test_in_D, MNIST_test_out_FMNIST_D, targets_FMNIST)\n",
+    "acc_out_notMNIST_D, prob_correct_out_notMNIST_D, ent_out_notMNIST_D, MMC_out_notMNIST_D, auroc_out_notMNIST_D = get_out_dist_values(MNIST_test_in_D, MNIST_test_out_notMNIST_D, targets_notMNIST)\n",
+    "acc_out_KMNIST_D, prob_correct_out_KMNIST_D, ent_out_KMNIST_D, MMC_out_KMNIST_D, auroc_out_KMNIST_D = get_out_dist_values(MNIST_test_in_D, MNIST_test_out_KMNIST_D, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, Diag, MNIST] Accuracy: 0.988; average entropy: 0.163;     MMC: 0.956; Prob @ correct: 0.100\n",
+      "[Out-fmnist, Diag, MNIST] Accuracy: 0.064; Average entropy: 1.345;    MMC: 0.527; AUROC: 0.978; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, Diag, MNIST] Accuracy: 0.155; Average entropy: 1.247;    MMC: 0.544; AUROC: 0.967; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, Diag, MNIST] Accuracy: 0.088; Average entropy: 1.289;    MMC: 0.521; AUROC: 0.975; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_D, prob_correct_in_D, ent_in_D, MMC_in_D, 'MNIST', 'Diag')\n",
+    "print_out_dist_values(acc_out_FMNIST_D, prob_correct_out_FMNIST_D, ent_out_FMNIST_D, MMC_out_FMNIST_D, auroc_out_FMNIST_D, 'MNIST', test='fmnist', method='Diag')\n",
+    "print_out_dist_values(acc_out_notMNIST_D, prob_correct_out_notMNIST_D, ent_out_notMNIST_D, MMC_out_notMNIST_D, auroc_out_notMNIST_D, 'MNIST', test='notMNIST', method='Diag')\n",
+    "print_out_dist_values(acc_out_KMNIST_D, prob_correct_out_KMNIST_D, ent_out_KMNIST_D, MMC_out_KMNIST_D, auroc_out_KMNIST_D, 'MNIST', test='KMNIST', method='Diag')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# KFAC Laplace Approximation (sampling)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/mariushobbhahn/opt/anaconda3/lib/python3.8/site-packages/laplace/utils.py:137: UserWarning: torch.symeig is deprecated in favor of torch.linalg.eigh and will be removed in a future PyTorch release.\n",
+      "The default behavior has changed from using the upper triangular portion of the matrix by default to using the lower triangular portion.\n",
+      "L, _ = torch.symeig(A, upper=upper)\n",
+      "should be replaced with\n",
+      "L = torch.linalg.eigvalsh(A, UPLO='U' if upper else 'L')\n",
+      "and\n",
+      "L, V = torch.symeig(A, eigenvectors=True)\n",
+      "should be replaced with\n",
+      "L, V = torch.linalg.eigh(A, UPLO='U' if upper else 'L') (Triggered internally at  ../aten/src/ATen/native/BatchLinearAlgebra.cpp:2499.)\n",
+      "  L, W = torch.symeig(M, eigenvectors=True)\n"
+     ]
+    }
+   ],
+   "source": [
+    "la_kfac = Laplace(mnist_model, 'classification', \n",
+    "                     subset_of_weights='last_layer', \n",
+    "                     hessian_structure='kron',\n",
+    "                     prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay\n",
+    "la_kfac.fit(MNIST_train_loader)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  31.942325999999994\n",
+      "time:  34.04294900000001\n",
+      "time:  60.50384299999999\n",
+      "time:  32.320914999999985\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_KFAC = predict_samples(la_kfac, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_KFAC = predict_samples(la_kfac, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_KFAC = predict_samples(la_kfac, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_KFAC = predict_samples(la_kfac, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "tensor(-0.0546)\n",
+      "tensor(-3.5597)\n",
+      "tensor(-3.9816)\n",
+      "tensor(-4.5797)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# compute average log-likelihood for KFAC\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_in_KFAC)).log_prob(torch.tensor(targets)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_KFAC)).log_prob(torch.tensor(targets_FMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_KFAC)).log_prob(torch.tensor(targets_notMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_KFAC)).log_prob(torch.tensor(targets_KMNIST)).mean())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.02971036363636363\n",
+      "0.3889274646464647\n",
+      "0.3543388866231208\n",
+      "0.3816629393939394\n"
+     ]
+    }
+   ],
+   "source": [
+    "# compute ECE for KFAC\n",
+    "print(scoring.expected_calibration_error(targets, MNIST_test_in_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_KFAC))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_KFAC, prob_correct_in_KFAC, ent_in_KFAC, MMC_in_KFAC = get_in_dist_values(MNIST_test_in_KFAC, targets)\n",
+    "acc_out_FMNIST_KFAC, prob_correct_out_FMNIST_KFAC, ent_out_FMNIST_KFAC, MMC_out_FMNIST_KFAC, auroc_out_FMNIST_KFAC = get_out_dist_values(MNIST_test_in_KFAC, MNIST_test_out_FMNIST_KFAC, targets_FMNIST)\n",
+    "acc_out_notMNIST_KFAC, prob_correct_out_notMNIST_KFAC, ent_out_notMNIST_KFAC, MMC_out_notMNIST_KFAC, auroc_out_notMNIST_KFAC = get_out_dist_values(MNIST_test_in_KFAC, MNIST_test_out_notMNIST_KFAC, targets_notMNIST)\n",
+    "acc_out_KMNIST_KFAC, prob_correct_out_KMNIST_KFAC, ent_out_KMNIST_KFAC, MMC_out_KMNIST_KFAC, auroc_out_KMNIST_KFAC = get_out_dist_values(MNIST_test_in_KFAC, MNIST_test_out_KMNIST_KFAC, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, KFAC, MNIST] Accuracy: 0.988; average entropy: 0.132;     MMC: 0.962; Prob @ correct: 0.100\n",
+      "[Out-fmnist, KFAC, MNIST] Accuracy: 0.063; Average entropy: 1.525;    MMC: 0.451; AUROC: 0.989; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, KFAC, MNIST] Accuracy: 0.151; Average entropy: 1.364;    MMC: 0.500; AUROC: 0.975; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, KFAC, MNIST] Accuracy: 0.091; Average entropy: 1.426;    MMC: 0.472; AUROC: 0.985; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_KFAC, prob_correct_in_KFAC, ent_in_KFAC, MMC_in_KFAC, 'MNIST', 'KFAC')\n",
+    "print_out_dist_values(acc_out_FMNIST_KFAC, prob_correct_out_FMNIST_KFAC, ent_out_FMNIST_KFAC, MMC_out_FMNIST_KFAC, auroc_out_FMNIST_KFAC, 'MNIST', test='fmnist', method='KFAC')\n",
+    "print_out_dist_values(acc_out_notMNIST_KFAC, prob_correct_out_notMNIST_KFAC, ent_out_notMNIST_KFAC, MMC_out_notMNIST_KFAC, auroc_out_notMNIST_KFAC, 'MNIST', test='notMNIST', method='KFAC')\n",
+    "print_out_dist_values(acc_out_KMNIST_KFAC, prob_correct_out_KMNIST_KFAC, ent_out_KMNIST_KFAC, MMC_out_KMNIST_KFAC, auroc_out_KMNIST_KFAC, 'MNIST', test='KMNIST', method='KFAC')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Laplace Bridge (Diagonal)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  3.4637579999999843\n",
+      "time:  3.538708000000014\n",
+      "time:  5.911788000000001\n",
+      "time:  3.510315999999989\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_LB_D = predict_LB(la_diag, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_LB_D = predict_LB(la_diag, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_LB_D = predict_LB(la_diag, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_LB_D = predict_LB(la_diag, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "tensor(-0.2654)\n",
+      "tensor(-2.5590)\n",
+      "tensor(-2.4996)\n",
+      "tensor(-2.6090)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# # compute average log-likelihood for LB\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_D)).log_prob(torch.tensor(targets)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_D)).log_prob(torch.tensor(targets_FMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_D)).log_prob(torch.tensor(targets_notMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_D)).log_prob(torch.tensor(targets_KMNIST)).mean())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.19069241414141405\n",
+      "0.23497902020202022\n",
+      "0.18711390771634312\n",
+      "0.19862494949494952\n"
+     ]
+    }
+   ],
+   "source": [
+    "#compute ECE for LB\n",
+    "print(scoring.expected_calibration_error(targets, MNIST_test_in_LB_D))\n",
+    "print(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_D))\n",
+    "print(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_D))\n",
+    "print(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_D))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_LB_D, prob_correct_in_LB_D, ent_in_LB_D, MMC_in_LB_D = get_in_dist_values(MNIST_test_in_LB_D, targets)\n",
+    "acc_out_FMNIST_LB_D, prob_correct_out_FMNIST_LB_D, ent_out_FMNIST_LB_D, MMC_out_FMNIST_LB_D, auroc_out_FMNIST_LB_D = get_out_dist_values(MNIST_test_in_LB_D, MNIST_test_out_FMNIST_LB_D, targets_FMNIST)\n",
+    "acc_out_notMNIST_LB_D, prob_correct_out_notMNIST_LB_D, ent_out_notMNIST_LB_D, MMC_out_notMNIST_LB_D, auroc_out_notMNIST_LB_D = get_out_dist_values(MNIST_test_in_LB_D, MNIST_test_out_notMNIST_LB_D, targets_notMNIST)\n",
+    "acc_out_KMNIST_LB_D, prob_correct_out_KMNIST_LB_D, ent_out_KMNIST_LB_D, MMC_out_KMNIST_LB_D, auroc_out_KMNIST_LB_D = get_out_dist_values(MNIST_test_in_LB_D, MNIST_test_out_KMNIST_LB_D, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, LB_D, MNIST] Accuracy: 0.988; average entropy: 0.806;     MMC: 0.798; Prob @ correct: 0.100\n",
+      "[Out-fmnist, LB_D, MNIST] Accuracy: 0.074; Average entropy: 2.023;    MMC: 0.306; AUROC: 0.971; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, LB_D, MNIST] Accuracy: 0.127; Average entropy: 1.999;    MMC: 0.294; AUROC: 0.965; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, LB_D, MNIST] Accuracy: 0.086; Average entropy: 2.028;    MMC: 0.285; AUROC: 0.974; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_LB_D, prob_correct_in_LB_D, ent_in_LB_D, MMC_in_LB_D, 'MNIST', 'LB_D')\n",
+    "print_out_dist_values(acc_out_FMNIST_LB_D, prob_correct_out_FMNIST_LB_D, ent_out_FMNIST_LB_D, MMC_out_FMNIST_LB_D, auroc_out_FMNIST_LB_D, 'MNIST', test='fmnist', method='LB_D')\n",
+    "print_out_dist_values(acc_out_notMNIST_LB_D, prob_correct_out_notMNIST_LB_D, ent_out_notMNIST_LB_D, MMC_out_notMNIST_LB_D, auroc_out_notMNIST_LB_D, 'MNIST', test='notMNIST', method='LB_D')\n",
+    "print_out_dist_values(acc_out_KMNIST_LB_D, prob_correct_out_KMNIST_LB_D, ent_out_KMNIST_LB_D, MMC_out_KMNIST_LB_D, auroc_out_KMNIST_LB_D, 'MNIST', test='KMNIST', method='LB_D')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# KFAC Laplace Bridge"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  33.15620799999999\n",
+      "time:  31.996719999999982\n",
+      "time:  59.684387000000015\n",
+      "time:  32.20037300000001\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_LB_KFAC = predict_LB(la_kfac, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_LB_KFAC = predict_LB(la_kfac, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_LB_KFAC = predict_LB(la_kfac, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_LB_KFAC = predict_LB(la_kfac, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "tensor(-0.1156)\n",
+      "tensor(-2.4397)\n",
+      "tensor(-2.4475)\n",
+      "tensor(-2.5835)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# compute average log-likelihood for LB KFAC\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_KFAC)).log_prob(torch.tensor(targets)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_KFAC)).log_prob(torch.tensor(targets_FMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_KFAC)).log_prob(torch.tensor(targets_notMNIST)).mean())\n",
+    "print(torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_KFAC)).log_prob(torch.tensor(targets_KMNIST)).mean())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 42,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.07462187878787876\n",
+      "0.15271682828282832\n",
+      "0.15304130279509473\n",
+      "0.16861525252525258\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(scoring.expected_calibration_error(targets, MNIST_test_in_LB_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_KFAC))\n",
+    "print(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_KFAC))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 43,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_LB_KFAC, prob_correct_in_LB_KFAC, ent_in_LB_KFAC, MMC_in_LB_KFAC = get_in_dist_values(MNIST_test_in_LB_KFAC, targets)\n",
+    "acc_out_FMNIST_LB_KFAC, prob_correct_out_FMNIST_LB_KFAC, ent_out_FMNIST_LB_KFAC, MMC_out_FMNIST_LB_KFAC, auroc_out_FMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFAC, MNIST_test_out_FMNIST_LB_KFAC, targets_FMNIST)\n",
+    "acc_out_notMNIST_LB_KFAC, prob_correct_out_notMNIST_LB_KFAC, ent_out_notMNIST_LB_KFAC, MMC_out_notMNIST_LB_KFAC, auroc_out_notMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFAC, MNIST_test_out_notMNIST_LB_KFAC, targets_notMNIST)\n",
+    "acc_out_KMNIST_LB_KFAC, prob_correct_out_KMNIST_LB_KFAC, ent_out_KMNIST_LB_KFAC, MMC_out_KMNIST_LB_KFAC, auroc_out_KMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFAC, MNIST_test_out_KMNIST_LB_KFAC, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, LB_KFAC, MNIST] Accuracy: 0.987; average entropy: 0.347;     MMC: 0.913; Prob @ correct: 0.100\n",
+      "[Out-fmnist, LB_KFAC, MNIST] Accuracy: 0.091; Average entropy: 2.167;    MMC: 0.234; AUROC: 0.996; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, LB_KFAC, MNIST] Accuracy: 0.135; Average entropy: 2.095;    MMC: 0.250; AUROC: 0.990; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, LB_KFAC, MNIST] Accuracy: 0.084; Average entropy: 2.096;    MMC: 0.252; AUROC: 0.993; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_LB_KFAC, prob_correct_in_LB_KFAC, ent_in_LB_KFAC, MMC_in_LB_KFAC, 'MNIST', 'LB_KFAC')\n",
+    "print_out_dist_values(acc_out_FMNIST_LB_KFAC, prob_correct_out_FMNIST_LB_KFAC, ent_out_FMNIST_LB_KFAC, MMC_out_FMNIST_LB_KFAC, auroc_out_FMNIST_LB_KFAC, 'MNIST', test='fmnist', method='LB_KFAC')\n",
+    "print_out_dist_values(acc_out_notMNIST_LB_KFAC, prob_correct_out_notMNIST_LB_KFAC, ent_out_notMNIST_LB_KFAC, MMC_out_notMNIST_LB_KFAC, auroc_out_notMNIST_LB_KFAC, 'MNIST', test='notMNIST', method='LB_KFAC')\n",
+    "print_out_dist_values(acc_out_KMNIST_LB_KFAC, prob_correct_out_KMNIST_LB_KFAC, ent_out_KMNIST_LB_KFAC, MMC_out_KMNIST_LB_KFAC, auroc_out_KMNIST_LB_KFAC, 'MNIST', test='KMNIST', method='LB_KFAC')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Compare to extended MacKay approach"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 47,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  3.5926079999999843\n",
+      "time:  3.703142000000014\n",
+      "time:  6.043317000000002\n",
+      "time:  3.7201180000000136\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_EMK_D = predict_extended_MacKay(la_diag, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_EMK_D = predict_extended_MacKay(la_diag, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_EMK_D = predict_extended_MacKay(la_diag, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_EMK_D = predict_extended_MacKay(la_diag, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 48,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK = get_in_dist_values(MNIST_test_in_EMK_D, targets)\n",
+    "acc_out_FMNIST_EMK, prob_correct_out_FMNIST_EMK, ent_out_FMNIST_EMK, MMC_out_FMNIST_EMK, auroc_out_FMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_FMNIST_EMK_D, targets_FMNIST)\n",
+    "acc_out_notMNIST_EMK, prob_correct_out_notMNIST_EMK, ent_out_notMNIST_EMK, MMC_out_notMNIST_EMK, auroc_out_notMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_notMNIST_EMK_D, targets_notMNIST)\n",
+    "acc_out_KMNIST_EMK, prob_correct_out_KMNIST_EMK, ent_out_KMNIST_EMK, MMC_out_KMNIST_EMK, auroc_out_KMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_KMNIST_EMK_D, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, EMK, MNIST] Accuracy: 0.988; average entropy: 0.125;     MMC: 0.968; Prob @ correct: 0.100\n",
+      "[Out-fmnist, EMK, MNIST] Accuracy: 0.066; Average entropy: 1.250;    MMC: 0.583; AUROC: 0.973; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, EMK, MNIST] Accuracy: 0.144; Average entropy: 1.144;    MMC: 0.607; AUROC: 0.958; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, EMK, MNIST] Accuracy: 0.086; Average entropy: 1.198;    MMC: 0.581; AUROC: 0.970; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK, 'MNIST', 'EMK')\n",
+    "print_out_dist_values(acc_out_FMNIST_EMK, prob_correct_out_FMNIST_EMK, ent_out_FMNIST_EMK, MMC_out_FMNIST_EMK, auroc_out_FMNIST_EMK, 'MNIST', test='fmnist', method='EMK')\n",
+    "print_out_dist_values(acc_out_notMNIST_EMK, prob_correct_out_notMNIST_EMK, ent_out_notMNIST_EMK, MMC_out_notMNIST_EMK, auroc_out_notMNIST_EMK, 'MNIST', test='notMNIST', method='EMK')\n",
+    "print_out_dist_values(acc_out_KMNIST_EMK, prob_correct_out_KMNIST_EMK, ent_out_KMNIST_EMK, MMC_out_KMNIST_EMK, auroc_out_KMNIST_EMK, 'MNIST', test='KMNIST', method='EMK')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Compare to Second-order Delta Posterior Predictive\n",
+    "\n",
+    "as detailed in Appendix D"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "time:  3.579964000000018\n",
+      "time:  3.5385799999999676\n",
+      "time:  5.960859000000028\n",
+      "time:  3.496875999999986\n"
+     ]
+    }
+   ],
+   "source": [
+    "MNIST_test_in_SODPP_D = predict_second_order_dpp(la_diag, MNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_FMNIST_SODPP_D = predict_second_order_dpp(la_diag, FMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_notMNIST_SODPP_D = predict_second_order_dpp(la_diag, notMNIST_test_loader, timing=True, device=device).cpu().numpy()\n",
+    "MNIST_test_out_KMNIST_SODPP_D = predict_second_order_dpp(la_diag, KMNIST_test_loader, timing=True, device=device).cpu().numpy()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/mariushobbhahn/Desktop/LB_for_BNNs_official/utils/LB_utils.py:117: RuntimeWarning: invalid value encountered in log\n",
+      "  average_entropy = -np.sum(py_in*np.log(py_in+1e-8), axis=1).mean()\n",
+      "/Users/mariushobbhahn/Desktop/LB_for_BNNs_official/utils/LB_utils.py:122: RuntimeWarning: invalid value encountered in log\n",
+      "  average_entropy = -np.sum(py_out*np.log(py_out+1e-8), axis=1).mean()\n",
+      "/Users/mariushobbhahn/Desktop/LB_for_BNNs_official/utils/LB_utils.py:122: RuntimeWarning: invalid value encountered in log\n",
+      "  average_entropy = -np.sum(py_out*np.log(py_out+1e-8), axis=1).mean()\n",
+      "/Users/mariushobbhahn/Desktop/LB_for_BNNs_official/utils/LB_utils.py:122: RuntimeWarning: invalid value encountered in log\n",
+      "  average_entropy = -np.sum(py_out*np.log(py_out+1e-8), axis=1).mean()\n"
+     ]
+    }
+   ],
+   "source": [
+    "acc_in_SODPP, prob_correct_in_SODPP, ent_in_SODPP, MMC_in_SODPP = get_in_dist_values(MNIST_test_in_SODPP_D, targets)\n",
+    "acc_out_FMNIST_SODPP, prob_correct_out_FMNIST_SODPP, ent_out_FMNIST_SODPP, MMC_out_FMNIST_SODPP, auroc_out_FMNIST_SODPP = get_out_dist_values(MNIST_test_in_SODPP_D, MNIST_test_out_FMNIST_SODPP_D, targets_FMNIST)\n",
+    "acc_out_notMNIST_SODPP, prob_correct_out_notMNIST_SODPP, ent_out_notMNIST_SODPP, MMC_out_notMNIST_SODPP, auroc_out_notMNIST_SODPP = get_out_dist_values(MNIST_test_in_SODPP_D, MNIST_test_out_notMNIST_SODPP_D, targets_notMNIST)\n",
+    "acc_out_KMNIST_SODPP, prob_correct_out_KMNIST_SODPP, ent_out_KMNIST_SODPP, MMC_out_KMNIST_SODPP, auroc_out_KMNIST_SODPP = get_out_dist_values(MNIST_test_in_SODPP_D, MNIST_test_out_KMNIST_SODPP_D, targets_KMNIST)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[In, SODPP, MNIST] Accuracy: 0.982; average entropy: nan;     MMC: 0.969; Prob @ correct: 0.100\n",
+      "[Out-fmnist, SODPP, MNIST] Accuracy: 0.070; Average entropy: nan;    MMC: 0.516; AUROC: 0.977; Prob @ correct: 0.100\n",
+      "[Out-notMNIST, SODPP, MNIST] Accuracy: 0.144; Average entropy: nan;    MMC: 0.747; AUROC: 0.844; Prob @ correct: 0.100\n",
+      "[Out-KMNIST, SODPP, MNIST] Accuracy: 0.087; Average entropy: nan;    MMC: 0.636; AUROC: 0.911; Prob @ correct: 0.100\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_in_dist_values(acc_in_SODPP, prob_correct_in_SODPP, ent_in_SODPP, MMC_in_SODPP, 'MNIST', 'SODPP')\n",
+    "print_out_dist_values(acc_out_FMNIST_SODPP, prob_correct_out_FMNIST_SODPP, ent_out_FMNIST_SODPP, MMC_out_FMNIST_SODPP, auroc_out_FMNIST_SODPP, 'MNIST', test='fmnist', method='SODPP')\n",
+    "print_out_dist_values(acc_out_notMNIST_SODPP, prob_correct_out_notMNIST_SODPP, ent_out_notMNIST_SODPP, MMC_out_notMNIST_SODPP, auroc_out_notMNIST_SODPP, 'MNIST', test='notMNIST', method='SODPP')\n",
+    "print_out_dist_values(acc_out_KMNIST_SODPP, prob_correct_out_KMNIST_SODPP, ent_out_KMNIST_SODPP, MMC_out_KMNIST_SODPP, auroc_out_KMNIST_SODPP, 'MNIST', test='KMNIST', method='SODPP')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "break"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Conditions\n",
+    "\n",
+    "Test the condition derived in Proposition 1 of the paper and evaluated experimentally in Appendix A"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# check if condition holds\n",
+    "\n",
+    "def check_condition(alpha_vecs):\n",
+    "    #note that this is vectorized\n",
+    "    alpha_sum = alpha_vecs.sum(1)\n",
+    "    alpha_max = alpha_vecs.max(1)\n",
+    "    alpha_sum_minus = alpha_sum - alpha_max\n",
+    "    right_side = 0.25 * (np.sqrt(9 * alpha_sum_minus**2 + 10 * alpha_sum_minus + 1) - alpha_sum_minus - 1)\n",
+    "    cases = alpha_max > right_side\n",
+    "    percentage = np.sum(cases)/len(cases)\n",
+    "    return(percentage)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(np.sum(check_condition(mnist_test_in_LB)))\n",
+    "print(np.sum(check_condition(mnist_test_out_FMNIST_LB)))\n",
+    "print(np.sum(check_condition(mnist_test_out_notMNIST_LB)))\n",
+    "print(np.sum(check_condition(mnist_test_out_KMNIST_LB)))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Experiments on Rotated MNIST"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import torchvision.transforms as transforms\n",
+    "# rotate 15 degrees\n",
+    "MNIST_transform_r15 = transforms.Compose([\n",
+    "    transforms.RandomRotation(15),\n",
+    "    transforms.ToTensor()\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r15 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r15)\n",
+    "\n",
+    "mnist_test_loader_r15 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r15,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 30 degrees\n",
+    "MNIST_transform_r30 = transforms.Compose([\n",
+    "    transforms.RandomRotation(30),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r30 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r30)\n",
+    "\n",
+    "mnist_test_loader_r30 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r30,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 45 degrees\n",
+    "MNIST_transform_r45 = transforms.Compose([\n",
+    "    transforms.RandomRotation(45),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r45 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r45)\n",
+    "\n",
+    "mnist_test_loader_r45 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r45,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 60 degrees\n",
+    "MNIST_transform_r60 = transforms.Compose([\n",
+    "    transforms.RandomRotation(60),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r60 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r60)\n",
+    "\n",
+    "mnist_test_loader_r60 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r60,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 75 degrees\n",
+    "MNIST_transform_r75 = transforms.Compose([\n",
+    "    transforms.RandomRotation(75),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r75 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r75)\n",
+    "\n",
+    "mnist_test_loader_r75 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r75,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 90 degrees\n",
+    "MNIST_transform_r90 = transforms.Compose([\n",
+    "    transforms.RandomRotation(90),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r90 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r90)\n",
+    "\n",
+    "mnist_test_loader_r90 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r90,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 105 degrees\n",
+    "MNIST_transform_r105 = transforms.Compose([\n",
+    "    transforms.RandomRotation(105),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r105 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r105)\n",
+    "\n",
+    "mnist_test_loader_r105 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r105,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 120 degrees\n",
+    "MNIST_transform_r120 = transforms.Compose([\n",
+    "    transforms.RandomRotation(120),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r120 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r120)\n",
+    "\n",
+    "mnist_test_loader_r120 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r120,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 135 degrees\n",
+    "MNIST_transform_r135 = transforms.Compose([\n",
+    "    transforms.RandomRotation(135),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r135 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r135)\n",
+    "\n",
+    "mnist_test_loader_r135 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r135,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 150 degrees\n",
+    "MNIST_transform_r150= transforms.Compose([\n",
+    "    transforms.RandomRotation(150),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r150 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r150)\n",
+    "\n",
+    "mnist_test_loader_r150 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r150,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 165 degrees\n",
+    "MNIST_transform_r165 = transforms.Compose([\n",
+    "    transforms.RandomRotation(165),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r165 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r165)\n",
+    "\n",
+    "mnist_test_loader_r165 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r165,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")\n",
+    "\n",
+    "# rotate 180 degrees\n",
+    "MNIST_transform_r180 = transforms.Compose([\n",
+    "    transforms.RandomRotation(180),\n",
+    "    transforms.ToTensor(),\n",
+    "    ])\n",
+    "\n",
+    "MNIST_test_r180 = torchvision.datasets.MNIST(\n",
+    "        '~/data/mnist',\n",
+    "        train=False,\n",
+    "        download=False,\n",
+    "        transform=MNIST_transform_r180)\n",
+    "\n",
+    "mnist_test_loader_r180 = torch.utils.data.dataloader.DataLoader(\n",
+    "    MNIST_test_r180,\n",
+    "    batch_size=BATCH_SIZE_TEST_MNIST,\n",
+    "    shuffle=False\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from sklearn.metrics import brier_score_loss\n",
+    "\n",
+    "## helper function: given a dataloader compute accuracy and brier score\n",
+    "def get_acc_brier(dataloader, targets, num_samples=1000):\n",
+    "    \n",
+    "    # compute sampling results\n",
+    "    mnist_rotated_D = predict_diagonal_sampling(mnist_model, dataloader, M_W_post_D, M_b_post_D, C_W_post_D, C_b_post_D, verbose=False, cuda=True, timing=False, n_samples=num_samples).cpu().numpy()\n",
+    "    \n",
+    "    # compute LB results\n",
+    "    mnist_rotated_LB = predict_LB(mnist_model, dataloader, M_W_post_D, M_b_post_D, C_W_post_D, C_b_post_D, verbose=False, cuda=True, timing=False).cpu().numpy()\n",
+    "    mnist_rotated_LBn = mnist_rotated_LB/mnist_rotated_LB.sum(1).reshape(-1,1)\n",
+    "    \n",
+    "    # accuracy for sampling and LB\n",
+    "    acc_D = np.mean(np.argmax(mnist_rotated_D, 1) == targets)\n",
+    "    acc_LB = np.mean(np.argmax(mnist_rotated_LBn, 1) == targets)\n",
+    "    \n",
+    "    # get brier score for sampling and LB\n",
+    "    pred_at_true_D = np.array([mnist_rotated_D[i, j] for i, j in enumerate(targets)])\n",
+    "    pred_at_true_LBn = np.array([mnist_rotated_LBn[i, j] for i, j in enumerate(targets)])\n",
+    "    \n",
+    "    brier_D = brier_score_loss(np.ones_like(pred_at_true_D), pred_at_true_D)\n",
+    "    brier_LB = brier_score_loss(np.ones_like(pred_at_true_LBn), pred_at_true_LBn)\n",
+    "    \n",
+    "    return(acc_D, acc_LB, brier_D, brier_LB)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# just a test\n",
+    "get_acc_brier(mnist_test_loader_r15, targets)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "## predict on all distributions and compute accuracy and brier score\n",
+    "\n",
+    "dataloader_list = [mnist_test_loader, mnist_test_loader_r15, mnist_test_loader_r30, mnist_test_loader_r45,\n",
+    "                  mnist_test_loader_r60, mnist_test_loader_r75, mnist_test_loader_r90, mnist_test_loader_r105,\n",
+    "                  mnist_test_loader_r120, mnist_test_loader_r135, mnist_test_loader_r150, mnist_test_loader_r165, \n",
+    "                  mnist_test_loader_r180]\n",
+    "\n",
+    "Acc_D_list = []\n",
+    "Acc_LB_list = []\n",
+    "Brier_D_list = []\n",
+    "Brier_LB_list = []\n",
+    "\n",
+    "for i, loader_ in enumerate(dataloader_list):\n",
+    "    print(i)\n",
+    "    Acc_D_, Acc_LB_, Brier_D_, Brier_LB_ = get_acc_brier(loader_, targets)\n",
+    "    Acc_D_list.append(Acc_D_)\n",
+    "    Acc_LB_list.append(Acc_LB_)\n",
+    "    Brier_D_list.append(Brier_D_)\n",
+    "    Brier_LB_list.append(Brier_LB_)\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Make inline plots vector graphics\n",
+    "import matplotlib\n",
+    "from IPython.display import set_matplotlib_formats\n",
+    "\n",
+    "set_matplotlib_formats(\"pdf\", \"svg\")\n",
+    "\n",
+    "matplotlib.rc(\"font\", **{\"family\": \"serif\", \"serif\": [\"Computer Modern\"]})\n",
+    "plt.rcParams[\"text.usetex\"] = True\n",
+    "plt.rcParams[\"text.latex.preamble\"] = r\"\\usepackage{amsfonts} \\usepackage{amsmath}\""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(Acc_D_list)\n",
+    "print(Acc_LB_list)\n",
+    "print(Brier_D_list)\n",
+    "print(Brier_LB_list)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#### compare over 5 seeds: 123, 124, 125, 126, 127\n",
+    "Acc_D_all = np.array([\n",
+    "    [0.9906, 0.981, 0.9401, 0.8593, 0.7388, 0.6375, 0.5627, 0.5049, 0.4703, 0.4533, 0.4363, 0.4287, 0.4268],\n",
+    "    [0.9889, 0.9814, 0.9433, 0.8518, 0.7337, 0.6403, 0.561, 0.5016, 0.4669, 0.4306, 0.4292, 0.4104, 0.4183],\n",
+    "    [0.9904, 0.9829, 0.946, 0.8582, 0.747, 0.6495, 0.5602, 0.5075, 0.4684, 0.4437, 0.4334, 0.4245, 0.4217],\n",
+    "    [0.9875, 0.9776, 0.9353, 0.8422, 0.7212, 0.6377, 0.55, 0.4896, 0.4497, 0.4328, 0.416, 0.4117, 0.4095],\n",
+    "    [0.9894, 0.9816, 0.9451, 0.8522, 0.7403, 0.6391, 0.5565, 0.4994, 0.4656, 0.4308, 0.4284, 0.4221, 0.4152]\n",
+    "])\n",
+    "\n",
+    "Acc_LB_all = np.array([\n",
+    "    [0.9907, 0.983, 0.9394, 0.8526, 0.7419, 0.6386, 0.5703, 0.5152, 0.4702, 0.4484, 0.4335, 0.4236, 0.4182],\n",
+    "    [0.9889, 0.9804, 0.9471, 0.8547, 0.7411, 0.6296, 0.5624, 0.4938, 0.4609, 0.4404, 0.4295, 0.4172, 0.4152],\n",
+    "    [0.9905, 0.9831, 0.9436, 0.8616, 0.7461, 0.6517, 0.5647, 0.5127, 0.4673, 0.4454, 0.4273, 0.4291, 0.415],\n",
+    "    [0.9876, 0.9799, 0.9398, 0.851, 0.7352, 0.6368, 0.5445, 0.4992, 0.4632, 0.4269, 0.42, 0.417, 0.4181],\n",
+    "    [0.9893, 0.9808, 0.939, 0.8465, 0.7338, 0.6312, 0.5573, 0.505, 0.4539, 0.4458, 0.4158, 0.4189, 0.4145]\n",
+    "])\n",
+    "\n",
+    "Brier_D_all = np.array([\n",
+    "    [0.008377700125184932, 0.016529366393931315, 0.05263197122933036, 0.12622978433992207, 0.23428155265648049, 0.33001102154197504, 0.40364649390174306, 0.45833621095510935, 0.48925685879783176, 0.5084873524892697, 0.5265005890140535, 0.5351897862160594, 0.535655688821819],\n",
+    "    [0.010744372283432188, 0.01861786528128727, 0.04921392785665237, 0.130553247122029, 0.23708335123859933, 0.3264322724129021, 0.4020700676185214, 0.45858313992431765, 0.49138653020376494, 0.5267105075863001, 0.5302083038117827, 0.5471840382483096, 0.5406172102829678],\n",
+    "    [0.008842406659404037, 0.01589756693721347, 0.04813633596723046, 0.12450638545589118, 0.2251983306557004, 0.31596819055291797, 0.39958471677594976, 0.4511044612864316, 0.4908296869743894, 0.513979687459884, 0.5228012975599322, 0.5331324584577392, 0.5366587666968312],\n",
+    "    [0.010730850229531219, 0.019535984307980356, 0.054532256239393395, 0.13633893796280153, 0.24614911889753252, 0.32741910714203704, 0.4095507809925442, 0.4699407662727923, 0.5086184210935191, 0.525650285971151, 0.544528220493102, 0.5479489062984142, 0.5516986011718078],\n",
+    "    [0.009795412763015064, 0.01817015340220003, 0.04894315094823046, 0.12908701202114847, 0.23282846945381916, 0.3285278649762006, 0.4081318056690933, 0.46182442301821763, 0.4973149243671581, 0.5269344762781906, 0.5322562363481955, 0.5380640556117866, 0.5471252220414157]\n",
+    "])\n",
+    "\n",
+    "Brier_LB_all = np.array([\n",
+    "    [0.007844242911062461, 0.015166313465830961, 0.05119071505966292, 0.13220723722716274, 0.23246172960926015, 0.3326357106190896, 0.4017439850542811, 0.45393964088759164, 0.49749242841385766, 0.5211752780472316, 0.5353101111950346, 0.5431750248692432, 0.5509519585301749],\n",
+    "    [0.009505463873917114, 0.016971207786010672, 0.0470778754224552, 0.12817579122361247, 0.2349776937700805, 0.339070595213455, 0.40568261118347, 0.4740733457035303, 0.5030623144832805, 0.5253332179429556, 0.5360191577762338, 0.549535112754868, 0.5511099660875561],\n",
+    "    [0.0076984171595750415, 0.014756499162356471, 0.0469422462627717, 0.12101585517824154, 0.22767872259093588, 0.31762503643888157, 0.4011728288118217, 0.4516875142101383, 0.4954514924412558, 0.5178717196068767, 0.5371807295796656, 0.5349908080424384, 0.5497019253514567],\n",
+    "    [0.01001831719153492, 0.016729483129191477, 0.05172484471829214, 0.13075484635707604, 0.23891760292945455, 0.3334325462508124, 0.42297503706889894, 0.4695227387634461, 0.5033610244309235, 0.5387111053297119, 0.5473753173717428, 0.5506346709903308, 0.5503556560492305],\n",
+    "    [0.008755419081030589, 0.01618864623953837, 0.05156303842716825, 0.13417919609729662, 0.23963138466766964, 0.34131713744443276, 0.4110757904444741, 0.46371903749768173, 0.5107108175950072, 0.5222953217647085, 0.5486314035009504, 0.5470332878374046, 0.5531479907833964]   \n",
+    "])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "Acc_D_all_mean = np.mean(Acc_D_all, axis=0)\n",
+    "Acc_D_all_std = np.std(Acc_D_all, axis=0)\n",
+    "\n",
+    "Acc_LB_all_mean = np.mean(Acc_LB_all, axis=0)\n",
+    "Acc_LB_all_std = np.std(Acc_LB_all, axis=0)\n",
+    "\n",
+    "Brier_D_all_mean = np.mean(Brier_D_all, axis=0)\n",
+    "Brier_D_all_std = np.std(Brier_D_all, axis=0)\n",
+    "\n",
+    "Brier_LB_all_mean = np.mean(Brier_LB_all, axis=0)\n",
+    "Brier_LB_all_std = np.std(Brier_LB_all, axis=0)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# make a figure for accuracy\n",
+    "x_labels = ['test', '15$^{\\circ}$', '30$^{\\circ}$', '45$^{\\circ}$', '60$^{\\circ}$', '75$^{\\circ}$', '90$^{\\circ}$',\n",
+    "            '105$^{\\circ}$', '120$^{\\circ}$', '135$^{\\circ}$', '150$^{\\circ}$', '165$^{\\circ}$', '180$^{\\circ}$']\n",
+    "\n",
+    "plt.figure(figsize=(5, 1.5))\n",
+    "plt.plot(x_labels, Acc_D_all_mean, color='blue', label='MCMC')\n",
+    "plt.plot(x_labels, Acc_LB_all_mean, color='firebrick', label='LB')\n",
+    "plt.ylim(0,1)\n",
+    "plt.ylabel('Accuracy', size=15)\n",
+    "#plt.legend()\n",
+    "plt.xticks(x_labels, x_labels, rotation='30', size=13)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "\n",
+    "plt.savefig('figures/LB_vs_MCMC_Acc.pdf')\n",
+    "plt.show();"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# make a figure for the brier score\n",
+    "\n",
+    "plt.figure(figsize=(5, 1.5))\n",
+    "plt.plot(x_labels, Brier_D_list, color='blue', label='MCMC')\n",
+    "plt.plot(x_labels, Brier_LB_list, color='firebrick', label='LB')\n",
+    "plt.ylim(0,0.8)\n",
+    "plt.ylabel('Brier', size=15)\n",
+    "plt.legend()\n",
+    "plt.xticks(x_labels, x_labels, rotation='30', size=13)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "\n",
+    "plt.savefig('figures/LB_vs_MCMC_Brier.pdf')\n",
+    "plt.show();"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# make a subplot\n",
+    "\n",
+    "fig, ax = plt.subplots(2, 1, figsize=(5, 3))\n",
+    "\n",
+    "ax[0].plot(x_labels, Acc_D_all_mean, color='blue', label='MCMC')\n",
+    "ax[0].plot(x_labels, Acc_LB_all_mean, color='firebrick', label='LB')\n",
+    "ax[0].set_ylim(0,1)\n",
+    "ax[0].set_ylabel('Accuracy', size=15)\n",
+    "ax[0].set_xticklabels([])\n",
+    "\n",
+    "ax[1].plot(x_labels, Brier_D_list, color='blue', label='MCMC')\n",
+    "ax[1].plot(x_labels, Brier_LB_list, color='firebrick', label='LB')\n",
+    "ax[1].set_ylim(0,0.8)\n",
+    "ax[1].set_ylabel('Brier', size=15)\n",
+    "ax[1].legend()\n",
+    "ax[1].set_xticklabels(x_labels, rotation=30, size=13)\n",
+    "\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "\n",
+    "plt.savefig('figures/LB_vs_MCMC_Acc_Brier.pdf')\n",
+    "plt.show();"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
