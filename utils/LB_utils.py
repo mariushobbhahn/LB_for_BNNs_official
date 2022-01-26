@@ -66,6 +66,20 @@ def predict_LB(laplace_model, data_loader, timing=False, device='cuda'):
 
 # apply Laplace Bridge
 @torch.no_grad()
+def predict_LB_norm(laplace_model, data_loader, timing=False, device='cuda'):
+    
+    py = []
+    t0 = time.process_time()
+    for x, _ in data_loader:
+        x = x.to(device)
+        py.append(laplace_model(x, link_approx='bridge_norm').detach())
+    t1 = time.process_time()
+    if timing:
+        print("time: ", t1 - t0)
+    return(torch.cat(py, dim=0))
+
+# apply Laplace Bridge
+@torch.no_grad()
 def predict_LB_alphas(laplace_model, data_loader, timing=False, device='cuda'):
     
     alphas = []
