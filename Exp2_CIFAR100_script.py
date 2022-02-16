@@ -180,13 +180,13 @@ def main():
         la_diag = Laplace(CIFAR100_model, 'classification', 
                      subset_of_weights='last_layer', 
                      hessian_structure='diag',
-                     prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay
+                     prior_precision=5e+1) # 5e-4 # Choose prior precision according to weight decay
         la_diag.fit(CIFAR100_train_loader)
 
         la_kron = Laplace(CIFAR100_model, 'classification', 
                      subset_of_weights='last_layer', 
                      hessian_structure='kron',
-                     prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay
+                     prior_precision=5e+0) # 5e-4 # Choose prior precision according to weight decay
         la_kron.fit(CIFAR100_train_loader)
 
         #MAP estimates
