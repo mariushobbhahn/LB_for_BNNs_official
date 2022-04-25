@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from laplace import Laplace
+import utils.scoring as scoring
 
 from utils.load_not_MNIST import notMNIST
 import argparse
@@ -131,6 +132,14 @@ def main():
     MAP_AUROC_FMNIST = []
     MAP_AUROC_notMNIST = []
     MAP_AUROC_KMNIST = []
+    MAP_NLL_in = []
+    MAP_NLL_FMNIST = []
+    MAP_NLL_notMNIST = []
+    MAP_NLL_KMNIST = []
+    MAP_ECE_in = []
+    MAP_ECE_FMNIST = []
+    MAP_ECE_notMNIST = []
+    MAP_ECE_KMNIST = []
     
     # Diag samples
     Diag_samples_MMC_in = []
@@ -140,6 +149,14 @@ def main():
     Diag_samples_AUROC_FMNIST = []
     Diag_samples_AUROC_notMNIST = []
     Diag_samples_AUROC_KMNIST = []
+    Diag_samples_NLL_in = []
+    Diag_samples_NLL_FMNIST = []
+    Diag_samples_NLL_notMNIST = []
+    Diag_samples_NLL_KMNIST = []
+    Diag_samples_ECE_in = []
+    Diag_samples_ECE_FMNIST = []
+    Diag_samples_ECE_notMNIST = []
+    Diag_samples_ECE_KMNIST = []
     
     # KFAC samples
     KFAC_samples_MMC_in = []
@@ -149,6 +166,14 @@ def main():
     KFAC_samples_AUROC_FMNIST = []
     KFAC_samples_AUROC_notMNIST = []
     KFAC_samples_AUROC_KMNIST = []
+    KFAC_samples_NLL_in = []
+    KFAC_samples_NLL_FMNIST = []
+    KFAC_samples_NLL_notMNIST = []
+    KFAC_samples_NLL_KMNIST = []
+    KFAC_samples_ECE_in = []
+    KFAC_samples_ECE_FMNIST = []
+    KFAC_samples_ECE_notMNIST = []
+    KFAC_samples_ECE_KMNIST = []
 
     # Diag LB
     Diag_LB_MMC_in = []
@@ -158,6 +183,14 @@ def main():
     Diag_LB_AUROC_FMNIST = []
     Diag_LB_AUROC_notMNIST = []
     Diag_LB_AUROC_KMNIST = []
+    Diag_LB_NLL_in = []
+    Diag_LB_NLL_FMNIST = []
+    Diag_LB_NLL_notMNIST = []
+    Diag_LB_NLL_KMNIST = []
+    Diag_LB_ECE_in = []
+    Diag_LB_ECE_FMNIST = []
+    Diag_LB_ECE_notMNIST = []
+    Diag_LB_ECE_KMNIST = []
     
     # KFAC LB
     KFAC_LB_MMC_in = []
@@ -167,6 +200,14 @@ def main():
     KFAC_LB_AUROC_FMNIST = []
     KFAC_LB_AUROC_notMNIST = []
     KFAC_LB_AUROC_KMNIST = [] 
+    KFAC_LB_NLL_in = []
+    KFAC_LB_NLL_FMNIST = []
+    KFAC_LB_NLL_notMNIST = []
+    KFAC_LB_NLL_KMNIST = []
+    KFAC_LB_ECE_in = []
+    KFAC_LB_ECE_FMNIST = []
+    KFAC_LB_ECE_notMNIST = []
+    KFAC_LB_ECE_KMNIST = []
 
     # Diag LB normalized
     Diag_LB_norm_MMC_in = []
@@ -176,6 +217,14 @@ def main():
     Diag_LB_norm_AUROC_FMNIST = []
     Diag_LB_norm_AUROC_notMNIST = []
     Diag_LB_norm_AUROC_KMNIST = []
+    Diag_LB_norm_NLL_in = []
+    Diag_LB_norm_NLL_FMNIST = []
+    Diag_LB_norm_NLL_notMNIST = []
+    Diag_LB_norm_NLL_KMNIST = []
+    Diag_LB_norm_ECE_in = []
+    Diag_LB_norm_ECE_FMNIST = []
+    Diag_LB_norm_ECE_notMNIST = []
+    Diag_LB_norm_ECE_KMNIST = []
     
     # KFAC LB normalized
     KFAC_LB_norm_MMC_in = []
@@ -185,25 +234,50 @@ def main():
     KFAC_LB_norm_AUROC_FMNIST = []
     KFAC_LB_norm_AUROC_notMNIST = []
     KFAC_LB_norm_AUROC_KMNIST = [] 
+    KFAC_LB_norm_NLL_in = []
+    KFAC_LB_norm_NLL_FMNIST = []
+    KFAC_LB_norm_NLL_notMNIST = []
+    KFAC_LB_norm_NLL_KMNIST = []
+    KFAC_LB_norm_ECE_in = []
+    KFAC_LB_norm_ECE_FMNIST = []
+    KFAC_LB_norm_ECE_notMNIST = []
+    KFAC_LB_norm_ECE_KMNIST = []
     
-    # Diag EMK
-    Diag_EMK_MMC_in = []
-    Diag_EMK_MMC_FMNIST = []
-    Diag_EMK_MMC_notMNIST = []
-    Diag_EMK_MMC_KMNIST = []
-    Diag_EMK_AUROC_FMNIST = []
-    Diag_EMK_AUROC_notMNIST = []
-    Diag_EMK_AUROC_KMNIST = []
+    # Diag PROBIT
+    Diag_PROBIT_MMC_in = []
+    Diag_PROBIT_MMC_FMNIST = []
+    Diag_PROBIT_MMC_notMNIST = []
+    Diag_PROBIT_MMC_KMNIST = []
+    Diag_PROBIT_AUROC_FMNIST = []
+    Diag_PROBIT_AUROC_notMNIST = []
+    Diag_PROBIT_AUROC_KMNIST = []
+    Diag_PROBIT_NLL_in = []
+    Diag_PROBIT_NLL_FMNIST = []
+    Diag_PROBIT_NLL_notMNIST = []
+    Diag_PROBIT_NLL_KMNIST = []
+    Diag_PROBIT_ECE_in = []
+    Diag_PROBIT_ECE_FMNIST = []
+    Diag_PROBIT_ECE_notMNIST = []
+    Diag_PROBIT_ECE_KMNIST = []
     
-    # KFAC EMK
-    KFAC_EMK_MMC_in = []
-    KFAC_EMK_MMC_FMNIST = []
-    KFAC_EMK_MMC_notMNIST = []
-    KFAC_EMK_MMC_KMNIST = []
-    KFAC_EMK_AUROC_FMNIST = []
-    KFAC_EMK_AUROC_notMNIST = []
-    KFAC_EMK_AUROC_KMNIST = []
+    # KFAC PROBIT
+    KFAC_PROBIT_MMC_in = []
+    KFAC_PROBIT_MMC_FMNIST = []
+    KFAC_PROBIT_MMC_notMNIST = []
+    KFAC_PROBIT_MMC_KMNIST = []
+    KFAC_PROBIT_AUROC_FMNIST = []
+    KFAC_PROBIT_AUROC_notMNIST = []
+    KFAC_PROBIT_AUROC_KMNIST = []
+    KFAC_PROBIT_NLL_in = []
+    KFAC_PROBIT_NLL_FMNIST = []
+    KFAC_PROBIT_NLL_notMNIST = []
+    KFAC_PROBIT_NLL_KMNIST = []
+    KFAC_PROBIT_ECE_in = []
+    KFAC_PROBIT_ECE_FMNIST = []
+    KFAC_PROBIT_ECE_notMNIST = []
+    KFAC_PROBIT_ECE_KMNIST = []
     
+    """
     # Diag SODPP
     Diag_SODPP_MMC_in = []
     Diag_SODPP_MMC_FMNIST = []
@@ -212,6 +286,14 @@ def main():
     Diag_SODPP_AUROC_FMNIST = []
     Diag_SODPP_AUROC_notMNIST = []
     Diag_SODPP_AUROC_KMNIST = []
+    Diag_SODPP_NLL_in = []
+    Diag_SODPP_NLL_FMNIST = []
+    Diag_SODPP_NLL_notMNIST = []
+    Diag_SODPP_NLL_KMNIST = []
+    Diag_SODPP_ECE_in = []
+    Diag_SODPP_ECE_FMNIST = []
+    Diag_SODPP_ECE_notMNIST = []
+    Diag_SODPP_ECE_KMNIST = []
     
     # KFAC SODPP
     KFAC_SODPP_MMC_in = []
@@ -221,6 +303,15 @@ def main():
     KFAC_SODPP_AUROC_FMNIST = []
     KFAC_SODPP_AUROC_notMNIST = []
     KFAC_SODPP_AUROC_KMNIST = []
+    KFAC_SODPP_NLL_in = []
+    KFAC_SODPP_NLL_FMNIST = []
+    KFAC_SODPP_NLL_notMNIST = []
+    KFAC_SODPP_NLL_KMNIST = []
+    KFAC_SODPP_ECE_in = []
+    KFAC_SODPP_ECE_FMNIST = []
+    KFAC_SODPP_ECE_notMNIST = []
+    KFAC_SODPP_ECE_KMNIST = []
+    """
     
     # run experiments
     for s in range(args.num_seeds):
@@ -247,12 +338,12 @@ def main():
 
         #MAP estimates
         MNIST_test_in_MAP = predict_MAP(mnist_model, MNIST_test_loader, device=device).cpu().numpy()
-        MNIST_test_out_fmnist_MAP = predict_MAP(mnist_model, FMNIST_test_loader, device=device).cpu().numpy()
+        MNIST_test_out_FMNIST_MAP = predict_MAP(mnist_model, FMNIST_test_loader, device=device).cpu().numpy()
         MNIST_test_out_notMNIST_MAP = predict_MAP(mnist_model, notMNIST_test_loader, device=device).cpu().numpy()
         MNIST_test_out_KMNIST_MAP = predict_MAP(mnist_model, KMNIST_test_loader, device=device).cpu().numpy()
         
         acc_in_MAP, prob_correct_in_MAP, ent_in_MAP, MMC_in_MAP = get_in_dist_values(MNIST_test_in_MAP, targets)
-        acc_out_FMNIST_MAP, prob_correct_out_FMNIST_MAP, ent_out_FMNIST_MAP, MMC_out_FMNIST_MAP, auroc_out_FMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_fmnist_MAP, targets_FMNIST)
+        acc_out_FMNIST_MAP, prob_correct_out_FMNIST_MAP, ent_out_FMNIST_MAP, MMC_out_FMNIST_MAP, auroc_out_FMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_FMNIST_MAP, targets_FMNIST)
         acc_out_notMNIST_MAP, prob_correct_out_notMNIST_MAP, ent_out_notMNIST_MAP, MMC_out_notMNIST_MAP, auroc_out_notMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_notMNIST_MAP, targets_notMNIST)
         acc_out_KMNIST_MAP, prob_correct_out_KMNIST_MAP, ent_out_KMNIST_MAP, MMC_out_KMNIST_MAP, auroc_out_KMNIST_MAP = get_out_dist_values(MNIST_test_in_MAP, MNIST_test_out_KMNIST_MAP, targets_KMNIST)
         
@@ -263,6 +354,15 @@ def main():
         MAP_AUROC_FMNIST.append(auroc_out_FMNIST_MAP)
         MAP_AUROC_notMNIST.append(auroc_out_notMNIST_MAP)
         MAP_AUROC_KMNIST.append(auroc_out_KMNIST_MAP)
+        MAP_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_MAP)).log_prob(torch.tensor(targets)).mean().item())
+        MAP_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_MAP)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        MAP_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_MAP)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        MAP_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_MAP)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        MAP_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_MAP))
+        MAP_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_MAP))
+        MAP_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_MAP))
+        MAP_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_MAP))
+
 
 
         #Diag samples
@@ -283,7 +383,16 @@ def main():
         Diag_samples_AUROC_FMNIST.append(auroc_out_FMNIST_D)
         Diag_samples_AUROC_notMNIST.append(auroc_out_notMNIST_D)
         Diag_samples_AUROC_KMNIST.append(auroc_out_KMNIST_D)
-        
+        Diag_samples_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_D)).log_prob(torch.tensor(targets)).mean().item())
+        Diag_samples_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_D)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        Diag_samples_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_D)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        Diag_samples_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_D)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        Diag_samples_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_D))
+        Diag_samples_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_D))
+        Diag_samples_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_D))
+        Diag_samples_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_D))
+    
+            
         #KFAC samples
         MNIST_test_in_KFAC = predict_samples(la_kron, MNIST_test_loader, timing=False, device=device).cpu().numpy()
         MNIST_test_out_FMNIST_KFAC = predict_samples(la_kron, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -303,6 +412,15 @@ def main():
         KFAC_samples_AUROC_FMNIST.append(auroc_out_FMNIST_KFAC)
         KFAC_samples_AUROC_notMNIST.append(auroc_out_notMNIST_KFAC)
         KFAC_samples_AUROC_KMNIST.append(auroc_out_KMNIST_KFAC)
+        KFAC_samples_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_KFAC)).log_prob(torch.tensor(targets)).mean().item())
+        KFAC_samples_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_KFAC)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        KFAC_samples_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_KFAC)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        KFAC_samples_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_KFAC)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        KFAC_samples_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_KFAC))
+        KFAC_samples_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_KFAC))
+        KFAC_samples_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_KFAC))
+        KFAC_samples_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_KFAC))
+
         
         #LB diag
         MNIST_test_in_LB_D = predict_LB(la_diag, MNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -322,6 +440,15 @@ def main():
         Diag_LB_AUROC_FMNIST.append(auroc_out_FMNIST_LB_D)
         Diag_LB_AUROC_notMNIST.append(auroc_out_notMNIST_LB_D)
         Diag_LB_AUROC_KMNIST.append(auroc_out_KMNIST_LB_D)
+        Diag_LB_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_D)).log_prob(torch.tensor(targets)).mean().item())
+        Diag_LB_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_D)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        Diag_LB_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_D)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        Diag_LB_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_D)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        Diag_LB_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_LB_D))
+        Diag_LB_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_D))
+        Diag_LB_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_D))
+        Diag_LB_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_D))
+
         
         #LB KFAC
         MNIST_test_in_LB_KFAC = predict_LB(la_kron, MNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -341,6 +468,15 @@ def main():
         KFAC_LB_AUROC_FMNIST.append(auroc_out_FMNIST_LB_KFAC)
         KFAC_LB_AUROC_notMNIST.append(auroc_out_notMNIST_LB_KFAC)
         KFAC_LB_AUROC_KMNIST.append(auroc_out_KMNIST_LB_KFAC)
+        KFAC_LB_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_KFAC)).log_prob(torch.tensor(targets)).mean().item())
+        KFAC_LB_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_KFAC)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        KFAC_LB_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_KFAC)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        KFAC_LB_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_KFAC)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        KFAC_LB_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_LB_KFAC))
+        KFAC_LB_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_KFAC))
+        KFAC_LB_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_KFAC))
+        KFAC_LB_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_KFAC))
+
 
         #LB diag normalized
         MNIST_test_in_LB_Dn = predict_LB_norm(la_diag, MNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -360,6 +496,15 @@ def main():
         Diag_LB_norm_AUROC_FMNIST.append(auroc_out_FMNIST_LB_D)
         Diag_LB_norm_AUROC_notMNIST.append(auroc_out_notMNIST_LB_D)
         Diag_LB_norm_AUROC_KMNIST.append(auroc_out_KMNIST_LB_D)
+        Diag_LB_norm_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_Dn)).log_prob(torch.tensor(targets)).mean().item())
+        Diag_LB_norm_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_Dn)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        Diag_LB_norm_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_Dn)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        Diag_LB_norm_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_Dn)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        Diag_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_LB_Dn))
+        Diag_LB_norm_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_Dn))
+        Diag_LB_norm_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_Dn))
+        Diag_LB_norm_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_Dn))
+
         
         #LB KFAC normalized
         MNIST_test_in_LB_KFACn = predict_LB_norm(la_kron, MNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -367,57 +512,85 @@ def main():
         MNIST_test_out_notMNIST_LB_KFACn = predict_LB_norm(la_kron, notMNIST_test_loader, timing=False, device=device).cpu().numpy()
         MNIST_test_out_KMNIST_LB_KFACn = predict_LB_norm(la_kron, KMNIST_test_loader, timing=False, device=device).cpu().numpy()
         
-        acc_in_LB_KFAC, prob_correct_in_LB_KFAC, ent_in_LB_KFAC, MMC_in_LB_KFAC = get_in_dist_values(MNIST_test_in_LB_KFACn, targets)
-        acc_out_FMNIST_LB_KFAC, prob_correct_out_FMNIST_LB_KFAC, ent_out_FMNIST_LB_KFAC, MMC_out_FMNIST_LB_KFAC, auroc_out_FMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_FMNIST_LB_KFACn, targets_FMNIST)
-        acc_out_notMNIST_LB_KFAC, prob_correct_out_notMNIST_LB_KFAC, ent_out_notMNIST_LB_KFAC, MMC_out_notMNIST_LB_KFAC, auroc_out_notMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_notMNIST_LB_KFACn, targets_notMNIST)
-        acc_out_KMNIST_LB_KFAC, prob_correct_out_KMNIST_LB_KFAC, ent_out_KMNIST_LB_KFAC, MMC_out_KMNIST_LB_KFAC, auroc_out_KMNIST_LB_KFAC = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_KMNIST_LB_KFACn, targets_KMNIST)
+        acc_in_LB_KFAC, prob_correct_in_LB_KFAC, ent_in_LB_KFAC, MMC_in_LB_KFACn = get_in_dist_values(MNIST_test_in_LB_KFACn, targets)
+        acc_out_FMNIST_LB_KFAC, prob_correct_out_FMNIST_LB_KFAC, ent_out_FMNIST_LB_KFAC, MMC_out_FMNIST_LB_KFACn, auroc_out_FMNIST_LB_KFACn = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_FMNIST_LB_KFACn, targets_FMNIST)
+        acc_out_notMNIST_LB_KFAC, prob_correct_out_notMNIST_LB_KFAC, ent_out_notMNIST_LB_KFAC, MMC_out_notMNIST_LB_KFACn, auroc_out_notMNIST_LB_KFACn = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_notMNIST_LB_KFACn, targets_notMNIST)
+        acc_out_KMNIST_LB_KFAC, prob_correct_out_KMNIST_LB_KFAC, ent_out_KMNIST_LB_KFAC, MMC_out_KMNIST_LB_KFACn, auroc_out_KMNIST_LB_KFACn = get_out_dist_values(MNIST_test_in_LB_KFACn, MNIST_test_out_KMNIST_LB_KFACn, targets_KMNIST)
         
-        KFAC_LB_norm_MMC_in.append(MMC_in_LB_KFAC)
-        KFAC_LB_norm_MMC_FMNIST.append(MMC_out_FMNIST_LB_KFAC)
-        KFAC_LB_norm_MMC_notMNIST.append(MMC_out_notMNIST_LB_KFAC)
-        KFAC_LB_norm_MMC_KMNIST.append(MMC_out_KMNIST_LB_KFAC)
-        KFAC_LB_norm_AUROC_FMNIST.append(auroc_out_FMNIST_LB_KFAC)
-        KFAC_LB_norm_AUROC_notMNIST.append(auroc_out_notMNIST_LB_KFAC)
-        KFAC_LB_norm_AUROC_KMNIST.append(auroc_out_KMNIST_LB_KFAC)
+        KFAC_LB_norm_MMC_in.append(MMC_in_LB_KFACn)
+        KFAC_LB_norm_MMC_FMNIST.append(MMC_out_FMNIST_LB_KFACn)
+        KFAC_LB_norm_MMC_notMNIST.append(MMC_out_notMNIST_LB_KFACn)
+        KFAC_LB_norm_MMC_KMNIST.append(MMC_out_KMNIST_LB_KFACn)
+        KFAC_LB_norm_AUROC_FMNIST.append(auroc_out_FMNIST_LB_KFACn)
+        KFAC_LB_norm_AUROC_notMNIST.append(auroc_out_notMNIST_LB_KFACn)
+        KFAC_LB_norm_AUROC_KMNIST.append(auroc_out_KMNIST_LB_KFACn)
+        KFAC_LB_norm_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_LB_KFACn)).log_prob(torch.tensor(targets)).mean().item())
+        KFAC_LB_norm_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_LB_KFACn)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        KFAC_LB_norm_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_LB_KFACn)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        KFAC_LB_norm_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_LB_KFACn)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        KFAC_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_LB_KFACn))
+        KFAC_LB_norm_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_KFACn))
+        KFAC_LB_norm_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_KFACn))
+        KFAC_LB_norm_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_KFACn))
+
         
-        #Extended MacKay diag
-        MNIST_test_in_EMK_D = predict_extended_MacKay(la_diag, MNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_FMNIST_EMK_D = predict_extended_MacKay(la_diag, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_notMNIST_EMK_D = predict_extended_MacKay(la_diag, notMNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_KMNIST_EMK_D = predict_extended_MacKay(la_diag, KMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        #Probit diag
+        MNIST_test_in_PROBIT_D = predict_probit(la_diag, MNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_FMNIST_PROBIT_D = predict_probit(la_diag, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_notMNIST_PROBIT_D = predict_probit(la_diag, notMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_KMNIST_PROBIT_D = predict_probit(la_diag, KMNIST_test_loader, timing=False, device=device).cpu().numpy()
         
-        acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK = get_in_dist_values(MNIST_test_in_EMK_D, targets)
-        acc_out_FMNIST_EMK, prob_correct_out_FMNIST_EMK, ent_out_FMNIST_EMK, MMC_out_FMNIST_EMK, auroc_out_FMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_FMNIST_EMK_D, targets_FMNIST)
-        acc_out_notMNIST_EMK, prob_correct_out_notMNIST_EMK, ent_out_notMNIST_EMK, MMC_out_notMNIST_EMK, auroc_out_notMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_notMNIST_EMK_D, targets_notMNIST)
-        acc_out_KMNIST_EMK, prob_correct_out_KMNIST_EMK, ent_out_KMNIST_EMK, MMC_out_KMNIST_EMK, auroc_out_KMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_D, MNIST_test_out_KMNIST_EMK_D, targets_KMNIST)
+        acc_in_PROBIT, prob_correct_in_PROBIT, ent_in_PROBIT, MMC_in_PROBIT = get_in_dist_values(MNIST_test_in_PROBIT_D, targets)
+        acc_out_FMNIST_PROBIT, prob_correct_out_FMNIST_PROBIT, ent_out_FMNIST_PROBIT, MMC_out_FMNIST_PROBIT, auroc_out_FMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_D, MNIST_test_out_FMNIST_PROBIT_D, targets_FMNIST)
+        acc_out_notMNIST_PROBIT, prob_correct_out_notMNIST_PROBIT, ent_out_notMNIST_PROBIT, MMC_out_notMNIST_PROBIT, auroc_out_notMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_D, MNIST_test_out_notMNIST_PROBIT_D, targets_notMNIST)
+        acc_out_KMNIST_PROBIT, prob_correct_out_KMNIST_PROBIT, ent_out_KMNIST_PROBIT, MMC_out_KMNIST_PROBIT, auroc_out_KMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_D, MNIST_test_out_KMNIST_PROBIT_D, targets_KMNIST)
+            
+        Diag_PROBIT_MMC_in.append(MMC_in_PROBIT)
+        Diag_PROBIT_MMC_FMNIST.append(MMC_out_FMNIST_PROBIT)
+        Diag_PROBIT_MMC_notMNIST.append(MMC_out_notMNIST_PROBIT)
+        Diag_PROBIT_MMC_KMNIST.append(MMC_out_KMNIST_PROBIT)
+        Diag_PROBIT_AUROC_FMNIST.append(auroc_out_FMNIST_PROBIT)
+        Diag_PROBIT_AUROC_notMNIST.append(auroc_out_notMNIST_PROBIT)
+        Diag_PROBIT_AUROC_KMNIST.append(auroc_out_KMNIST_PROBIT)
+        Diag_PROBIT_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_PROBIT_D)).log_prob(torch.tensor(targets)).mean().item())
+        Diag_PROBIT_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_PROBIT_D)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        Diag_PROBIT_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_PROBIT_D)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        Diag_PROBIT_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_PROBIT_D)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        Diag_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_PROBIT_D))
+        Diag_PROBIT_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_PROBIT_D))
+        Diag_PROBIT_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_PROBIT_D))
+        Diag_PROBIT_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_PROBIT_D))
+
         
-        Diag_EMK_MMC_in.append(MMC_in_EMK)
-        Diag_EMK_MMC_FMNIST.append(MMC_out_FMNIST_EMK)
-        Diag_EMK_MMC_notMNIST.append(MMC_out_notMNIST_EMK)
-        Diag_EMK_MMC_KMNIST.append(MMC_out_KMNIST_EMK)
-        Diag_EMK_AUROC_FMNIST.append(auroc_out_FMNIST_EMK)
-        Diag_EMK_AUROC_notMNIST.append(auroc_out_notMNIST_EMK)
-        Diag_EMK_AUROC_KMNIST.append(auroc_out_KMNIST_EMK)
+        #Probit KFAC
+        MNIST_test_in_PROBIT_K = predict_probit(la_kron, MNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_FMNIST_PROBIT_K = predict_probit(la_kron, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_notMNIST_PROBIT_K = predict_probit(la_kron, notMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        MNIST_test_out_KMNIST_PROBIT_K = predict_probit(la_kron, KMNIST_test_loader, timing=False, device=device).cpu().numpy()
         
-        #Extended MacKay KFAC
-        MNIST_test_in_EMK_K = predict_extended_MacKay(la_kron, MNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_FMNIST_EMK_K = predict_extended_MacKay(la_kron, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_notMNIST_EMK_K = predict_extended_MacKay(la_kron, notMNIST_test_loader, timing=False, device=device).cpu().numpy()
-        MNIST_test_out_KMNIST_EMK_K = predict_extended_MacKay(la_kron, KMNIST_test_loader, timing=False, device=device).cpu().numpy()
+        acc_in_PROBIT, prob_correct_in_PROBIT, ent_in_PROBIT, MMC_in_PROBIT = get_in_dist_values(MNIST_test_in_PROBIT_K, targets)
+        acc_out_FMNIST_PROBIT, prob_correct_out_FMNIST_PROBIT, ent_out_FMNIST_PROBIT, MMC_out_FMNIST_PROBIT, auroc_out_FMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_K, MNIST_test_out_FMNIST_PROBIT_K, targets_FMNIST)
+        acc_out_notMNIST_PROBIT, prob_correct_out_notMNIST_PROBIT, ent_out_notMNIST_PROBIT, MMC_out_notMNIST_PROBIT, auroc_out_notMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_K, MNIST_test_out_notMNIST_PROBIT_K, targets_notMNIST)
+        acc_out_KMNIST_PROBIT, prob_correct_out_KMNIST_PROBIT, ent_out_KMNIST_PROBIT, MMC_out_KMNIST_PROBIT, auroc_out_KMNIST_PROBIT = get_out_dist_values(MNIST_test_in_PROBIT_K, MNIST_test_out_KMNIST_PROBIT_K, targets_KMNIST)
         
-        acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK = get_in_dist_values(MNIST_test_in_EMK_K, targets)
-        acc_out_FMNIST_EMK, prob_correct_out_FMNIST_EMK, ent_out_FMNIST_EMK, MMC_out_FMNIST_EMK, auroc_out_FMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_K, MNIST_test_out_FMNIST_EMK_K, targets_FMNIST)
-        acc_out_notMNIST_EMK, prob_correct_out_notMNIST_EMK, ent_out_notMNIST_EMK, MMC_out_notMNIST_EMK, auroc_out_notMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_K, MNIST_test_out_notMNIST_EMK_K, targets_notMNIST)
-        acc_out_KMNIST_EMK, prob_correct_out_KMNIST_EMK, ent_out_KMNIST_EMK, MMC_out_KMNIST_EMK, auroc_out_KMNIST_EMK = get_out_dist_values(MNIST_test_in_EMK_K, MNIST_test_out_KMNIST_EMK_K, targets_KMNIST)
+        KFAC_PROBIT_MMC_in.append(MMC_in_PROBIT)
+        KFAC_PROBIT_MMC_FMNIST.append(MMC_out_FMNIST_PROBIT)
+        KFAC_PROBIT_MMC_notMNIST.append(MMC_out_notMNIST_PROBIT)
+        KFAC_PROBIT_MMC_KMNIST.append(MMC_out_KMNIST_PROBIT)
+        KFAC_PROBIT_AUROC_FMNIST.append(auroc_out_FMNIST_PROBIT)
+        KFAC_PROBIT_AUROC_notMNIST.append(auroc_out_notMNIST_PROBIT)
+        KFAC_PROBIT_AUROC_KMNIST.append(auroc_out_KMNIST_PROBIT)
+        KFAC_PROBIT_NLL_in.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_in_PROBIT_K)).log_prob(torch.tensor(targets)).mean().item())
+        KFAC_PROBIT_NLL_FMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_FMNIST_PROBIT_K)).log_prob(torch.tensor(targets_FMNIST)).mean().item())
+        KFAC_PROBIT_NLL_notMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_notMNIST_PROBIT_K)).log_prob(torch.tensor(targets_notMNIST)).mean().item())
+        KFAC_PROBIT_NLL_KMNIST.append(-torch.distributions.Categorical(torch.tensor(MNIST_test_out_KMNIST_PROBIT_K)).log_prob(torch.tensor(targets_KMNIST)).mean().item())
+        KFAC_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets, MNIST_test_in_PROBIT_K))
+        KFAC_PROBIT_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_PROBIT_K))
+        KFAC_PROBIT_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_PROBIT_K))
+        KFAC_PROBIT_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_PROBIT_K))
+
         
-        KFAC_EMK_MMC_in.append(MMC_in_EMK)
-        KFAC_EMK_MMC_FMNIST.append(MMC_out_FMNIST_EMK)
-        KFAC_EMK_MMC_notMNIST.append(MMC_out_notMNIST_EMK)
-        KFAC_EMK_MMC_KMNIST.append(MMC_out_KMNIST_EMK)
-        KFAC_EMK_AUROC_FMNIST.append(auroc_out_FMNIST_EMK)
-        KFAC_EMK_AUROC_notMNIST.append(auroc_out_notMNIST_EMK)
-        KFAC_EMK_AUROC_KMNIST.append(auroc_out_KMNIST_EMK)
-        
+        """
         #SODPP diag
         MNIST_test_in_SODPP_D = predict_second_order_dpp(la_diag, MNIST_test_loader, timing=False, device=device).cpu().numpy()
         MNIST_test_out_FMNIST_SODPP_D = predict_second_order_dpp(la_diag, FMNIST_test_loader, timing=False, device=device).cpu().numpy()
@@ -455,6 +628,7 @@ def main():
         KFAC_SODPP_AUROC_FMNIST.append(auroc_out_FMNIST_SODPP)
         KFAC_SODPP_AUROC_notMNIST.append(auroc_out_notMNIST_SODPP)
         KFAC_SODPP_AUROC_KMNIST.append(auroc_out_KMNIST_SODPP)
+        """
         
     #### save results
     results_dict = {
@@ -466,6 +640,14 @@ def main():
         'MAP_AUROC_FMNIST':MAP_AUROC_FMNIST,
         'MAP_AUROC_notMNIST':MAP_AUROC_notMNIST,
         'MAP_AUROC_KMNIST':MAP_AUROC_KMNIST,
+        'MAP_NLL_in':MAP_NLL_in,
+        'MAP_NLL_FMNIST':MAP_NLL_FMNIST,
+        'MAP_NLL_notMNIST':MAP_NLL_notMNIST,
+        'MAP_NLL_KMNIST':MAP_NLL_KMNIST,
+        'MAP_ECE_in':MAP_ECE_in,
+        'MAP_ECE_FMNIST':MAP_ECE_FMNIST,
+        'MAP_ECE_notMNIST':MAP_ECE_notMNIST,
+        'MAP_ECE_KMNIST':MAP_ECE_KMNIST,
         'Diag_samples_MMC_in':Diag_samples_MMC_in,
         'Diag_samples_MMC_FMNIST':Diag_samples_MMC_FMNIST,
         'Diag_samples_MMC_notMNIST':Diag_samples_MMC_notMNIST,
@@ -473,6 +655,14 @@ def main():
         'Diag_samples_AUROC_FMNIST':Diag_samples_AUROC_FMNIST,
         'Diag_samples_AUROC_notMNIST':Diag_samples_AUROC_notMNIST,
         'Diag_samples_AUROC_KMNIST':Diag_samples_AUROC_KMNIST,
+        'Diag_samples_NLL_in':Diag_samples_NLL_in,
+        'Diag_samples_NLL_FMNIST':Diag_samples_NLL_FMNIST,
+        'Diag_samples_NLL_notMNIST':Diag_samples_NLL_notMNIST,
+        'Diag_samples_NLL_KMNIST':Diag_samples_NLL_KMNIST,
+        'Diag_samples_ECE_in':Diag_samples_ECE_in,
+        'Diag_samples_ECE_FMNIST':Diag_samples_ECE_FMNIST,
+        'Diag_samples_ECE_notMNIST':Diag_samples_ECE_notMNIST,
+        'Diag_samples_ECE_KMNIST':Diag_samples_ECE_KMNIST,
         'KFAC_samples_MMC_in':KFAC_samples_MMC_in,
         'KFAC_samples_MMC_FMNIST':KFAC_samples_MMC_FMNIST,
         'KFAC_samples_MMC_notMNIST':KFAC_samples_MMC_notMNIST,
@@ -480,6 +670,14 @@ def main():
         'KFAC_samples_AUROC_FMNIST':KFAC_samples_AUROC_FMNIST,
         'KFAC_samples_AUROC_notMNIST':KFAC_samples_AUROC_notMNIST,
         'KFAC_samples_AUROC_KMNIST':KFAC_samples_AUROC_KMNIST,
+        'KFAC_samples_NLL_in':KFAC_samples_NLL_in,
+        'KFAC_samples_NLL_FMNIST':KFAC_samples_NLL_FMNIST,
+        'KFAC_samples_NLL_notMNIST':KFAC_samples_NLL_notMNIST,
+        'KFAC_samples_NLL_KMNIST':KFAC_samples_NLL_KMNIST,
+        'KFAC_samples_ECE_in':KFAC_samples_ECE_in,
+        'KFAC_samples_ECE_FMNIST':KFAC_samples_ECE_FMNIST,
+        'KFAC_samples_ECE_notMNIST':KFAC_samples_ECE_notMNIST,
+        'KFAC_samples_ECE_KMNIST':KFAC_samples_ECE_KMNIST,
         'Diag_LB_MMC_in':Diag_LB_MMC_in,
         'Diag_LB_MMC_FMNIST':Diag_LB_MMC_FMNIST,
         'Diag_LB_MMC_notMNIST':Diag_LB_MMC_notMNIST,
@@ -487,6 +685,14 @@ def main():
         'Diag_LB_AUROC_FMNIST':Diag_LB_AUROC_FMNIST,
         'Diag_LB_AUROC_notMNIST':Diag_LB_AUROC_notMNIST,
         'Diag_LB_AUROC_KMNIST':Diag_LB_AUROC_KMNIST,
+        'Diag_LB_NLL_in':Diag_LB_NLL_in,
+        'Diag_LB_NLL_FMNIST':Diag_LB_NLL_FMNIST,
+        'Diag_LB_NLL_notMNIST':Diag_LB_NLL_notMNIST,
+        'Diag_LB_NLL_KMNIST':Diag_LB_NLL_KMNIST,
+        'Diag_LB_ECE_in':Diag_LB_ECE_in,
+        'Diag_LB_ECE_FMNIST':Diag_LB_ECE_FMNIST,
+        'Diag_LB_ECE_notMNIST':Diag_LB_ECE_notMNIST,
+        'Diag_LB_ECE_KMNIST':Diag_LB_ECE_KMNIST,
         'KFAC_LB_MMC_in':KFAC_LB_MMC_in,
         'KFAC_LB_MMC_FMNIST':KFAC_LB_MMC_FMNIST,
         'KFAC_LB_MMC_notMNIST':KFAC_LB_MMC_notMNIST,
@@ -494,6 +700,14 @@ def main():
         'KFAC_LB_AUROC_FMNIST':KFAC_LB_AUROC_FMNIST,
         'KFAC_LB_AUROC_notMNIST':KFAC_LB_AUROC_notMNIST,
         'KFAC_LB_AUROC_KMNIST':KFAC_LB_AUROC_KMNIST,
+        'KFAC_LB_NLL_in':KFAC_LB_NLL_in,
+        'KFAC_LB_NLL_FMNIST':KFAC_LB_NLL_FMNIST,
+        'KFAC_LB_NLL_notMNIST':KFAC_LB_NLL_notMNIST,
+        'KFAC_LB_NLL_KMNIST':KFAC_LB_NLL_KMNIST,
+        'KFAC_LB_ECE_in':KFAC_LB_ECE_in,
+        'KFAC_LB_ECE_FMNIST':KFAC_LB_ECE_FMNIST,
+        'KFAC_LB_ECE_notMNIST':KFAC_LB_ECE_notMNIST,
+        'KFAC_LB_ECE_KMNIST':KFAC_LB_ECE_KMNIST,
         'Diag_LB_norm_MMC_in':Diag_LB_norm_MMC_in,
         'Diag_LB_norm_MMC_FMNIST':Diag_LB_norm_MMC_FMNIST,
         'Diag_LB_norm_MMC_notMNIST':Diag_LB_norm_MMC_notMNIST,
@@ -501,6 +715,14 @@ def main():
         'Diag_LB_norm_AUROC_FMNIST':Diag_LB_norm_AUROC_FMNIST,
         'Diag_LB_norm_AUROC_notMNIST':Diag_LB_norm_AUROC_notMNIST,
         'Diag_LB_norm_AUROC_KMNIST':Diag_LB_norm_AUROC_KMNIST,
+        'Diag_LB_norm_NLL_in':Diag_LB_norm_NLL_in,
+        'Diag_LB_norm_NLL_FMNIST':Diag_LB_norm_NLL_FMNIST,
+        'Diag_LB_norm_NLL_notMNIST':Diag_LB_norm_NLL_notMNIST,
+        'Diag_LB_norm_NLL_KMNIST':Diag_LB_norm_NLL_KMNIST,
+        'Diag_LB_norm_ECE_in':Diag_LB_norm_ECE_in,
+        'Diag_LB_norm_ECE_FMNIST':Diag_LB_norm_ECE_FMNIST,
+        'Diag_LB_norm_ECE_notMNIST':Diag_LB_norm_ECE_notMNIST,
+        'Diag_LB_norm_ECE_KMNIST':Diag_LB_norm_ECE_KMNIST,
         'KFAC_LB_norm_MMC_in':KFAC_LB_norm_MMC_in,
         'KFAC_LB_norm_MMC_FMNIST':KFAC_LB_norm_MMC_FMNIST,
         'KFAC_LB_norm_MMC_notMNIST':KFAC_LB_norm_MMC_notMNIST,
@@ -508,34 +730,58 @@ def main():
         'KFAC_LB_norm_AUROC_FMNIST':KFAC_LB_norm_AUROC_FMNIST,
         'KFAC_LB_norm_AUROC_notMNIST':KFAC_LB_norm_AUROC_notMNIST,
         'KFAC_LB_norm_AUROC_KMNIST':KFAC_LB_norm_AUROC_KMNIST,
-        'Diag_EMK_MMC_in':Diag_EMK_MMC_in,
-        'Diag_EMK_MMC_FMNIST':Diag_EMK_MMC_FMNIST,
-        'Diag_EMK_MMC_notMNIST':Diag_EMK_MMC_notMNIST,
-        'Diag_EMK_MMC_KMNIST':Diag_EMK_MMC_KMNIST,
-        'Diag_EMK_AUROC_FMNIST':Diag_EMK_AUROC_FMNIST,
-        'Diag_EMK_AUROC_notMNIST':Diag_EMK_AUROC_notMNIST,
-        'Diag_EMK_AUROC_KMNIST':Diag_EMK_AUROC_KMNIST,
-        'KFAC_EMK_MMC_in':KFAC_EMK_MMC_in,
-        'KFAC_EMK_MMC_FMNIST':KFAC_EMK_MMC_FMNIST,
-        'KFAC_EMK_MMC_notMNIST':KFAC_EMK_MMC_notMNIST,
-        'KFAC_EMK_MMC_KMNIST':KFAC_EMK_MMC_KMNIST,
-        'KFAC_EMK_AUROC_FMNIST':KFAC_EMK_AUROC_FMNIST,
-        'KFAC_EMK_AUROC_notMNIST':KFAC_EMK_AUROC_notMNIST,
-        'KFAC_EMK_AUROC_KMNIST':KFAC_EMK_AUROC_KMNIST,
-        'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
-        'Diag_SODPP_MMC_FMNIST':Diag_SODPP_MMC_FMNIST,
-        'Diag_SODPP_MMC_notMNIST':Diag_SODPP_MMC_notMNIST,
-        'Diag_SODPP_MMC_KMNIST':Diag_SODPP_MMC_KMNIST,
-        'Diag_SODPP_AUROC_FMNIST':Diag_SODPP_AUROC_FMNIST,
-        'Diag_SODPP_AUROC_notMNIST':Diag_SODPP_AUROC_notMNIST,
-        'Diag_SODPP_AUROC_KMNIST':Diag_SODPP_AUROC_KMNIST,
-        'KFAC_SODPP_MMC_in':KFAC_SODPP_MMC_in,
-        'KFAC_SODPP_MMC_FMNIST':KFAC_SODPP_MMC_FMNIST,
-        'KFAC_SODPP_MMC_notMNIST':KFAC_SODPP_MMC_notMNIST,
-        'KFAC_SODPP_MMC_KMNIST':KFAC_SODPP_MMC_KMNIST,
-        'KFAC_SODPP_AUROC_FMNIST':KFAC_SODPP_AUROC_FMNIST,
-        'KFAC_SODPP_AUROC_notMNIST':KFAC_SODPP_AUROC_notMNIST,
-        'KFAC_SODPP_AUROC_KMNIST':KFAC_SODPP_AUROC_KMNIST
+        'KFAC_LB_norm_NLL_in':KFAC_LB_norm_NLL_in,
+        'KFAC_LB_norm_NLL_FMNIST':KFAC_LB_norm_NLL_FMNIST,
+        'KFAC_LB_norm_NLL_notMNIST':KFAC_LB_norm_NLL_notMNIST,
+        'KFAC_LB_norm_NLL_KMNIST':KFAC_LB_norm_NLL_KMNIST,
+        'KFAC_LB_norm_ECE_in':KFAC_LB_norm_ECE_in,
+        'KFAC_LB_norm_ECE_FMNIST':KFAC_LB_norm_ECE_FMNIST,
+        'KFAC_LB_norm_ECE_notMNIST':KFAC_LB_norm_ECE_notMNIST,
+        'KFAC_LB_norm_ECE_KMNIST':KFAC_LB_norm_ECE_KMNIST,
+        'Diag_PROBIT_MMC_in':Diag_PROBIT_MMC_in,
+        'Diag_PROBIT_MMC_FMNIST':Diag_PROBIT_MMC_FMNIST,
+        'Diag_PROBIT_MMC_notMNIST':Diag_PROBIT_MMC_notMNIST,
+        'Diag_PROBIT_MMC_KMNIST':Diag_PROBIT_MMC_KMNIST,
+        'Diag_PROBIT_AUROC_FMNIST':Diag_PROBIT_AUROC_FMNIST,
+        'Diag_PROBIT_AUROC_notMNIST':Diag_PROBIT_AUROC_notMNIST,
+        'Diag_PROBIT_AUROC_KMNIST':Diag_PROBIT_AUROC_KMNIST,
+        'Diag_PROBIT_NLL_in':Diag_PROBIT_NLL_in,
+        'Diag_PROBIT_NLL_FMNIST':Diag_PROBIT_NLL_FMNIST,
+        'Diag_PROBIT_NLL_notMNIST':Diag_PROBIT_NLL_notMNIST,
+        'Diag_PROBIT_NLL_KMNIST':Diag_PROBIT_NLL_KMNIST,
+        'Diag_PROBIT_ECE_in':Diag_PROBIT_ECE_in,
+        'Diag_PROBIT_ECE_FMNIST':Diag_PROBIT_ECE_FMNIST,
+        'Diag_PROBIT_ECE_notMNIST':Diag_PROBIT_ECE_notMNIST,
+        'Diag_PROBIT_ECE_KMNIST':Diag_PROBIT_ECE_KMNIST,
+        'KFAC_PROBIT_MMC_in':KFAC_PROBIT_MMC_in,
+        'KFAC_PROBIT_MMC_FMNIST':KFAC_PROBIT_MMC_FMNIST,
+        'KFAC_PROBIT_MMC_notMNIST':KFAC_PROBIT_MMC_notMNIST,
+        'KFAC_PROBIT_MMC_KMNIST':KFAC_PROBIT_MMC_KMNIST,
+        'KFAC_PROBIT_AUROC_FMNIST':KFAC_PROBIT_AUROC_FMNIST,
+        'KFAC_PROBIT_AUROC_notMNIST':KFAC_PROBIT_AUROC_notMNIST,
+        'KFAC_PROBIT_AUROC_KMNIST':KFAC_PROBIT_AUROC_KMNIST,
+        'KFAC_PROBIT_NLL_in':KFAC_PROBIT_NLL_in,
+        'KFAC_PROBIT_NLL_FMNIST':KFAC_PROBIT_NLL_FMNIST,
+        'KFAC_PROBIT_NLL_notMNIST':KFAC_PROBIT_NLL_notMNIST,
+        'KFAC_PROBIT_NLL_KMNIST':KFAC_PROBIT_NLL_KMNIST,
+        'KFAC_PROBIT_ECE_in':KFAC_PROBIT_ECE_in,
+        'KFAC_PROBIT_ECE_FMNIST':KFAC_PROBIT_ECE_FMNIST,
+        'KFAC_PROBIT_ECE_notMNIST':KFAC_PROBIT_ECE_notMNIST,
+        'KFAC_PROBIT_ECE_KMNIST':KFAC_PROBIT_ECE_KMNIST,
+        #'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
+        #'Diag_SODPP_MMC_FMNIST':Diag_SODPP_MMC_FMNIST,
+        #'Diag_SODPP_MMC_notMNIST':Diag_SODPP_MMC_notMNIST,
+        #'Diag_SODPP_MMC_KMNIST':Diag_SODPP_MMC_KMNIST,
+        #'Diag_SODPP_AUROC_FMNIST':Diag_SODPP_AUROC_FMNIST,
+        #'Diag_SODPP_AUROC_notMNIST':Diag_SODPP_AUROC_notMNIST,
+        #'Diag_SODPP_AUROC_KMNIST':Diag_SODPP_AUROC_KMNIST,
+        #'KFAC_SODPP_MMC_in':KFAC_SODPP_MMC_in,
+        #'KFAC_SODPP_MMC_FMNIST':KFAC_SODPP_MMC_FMNIST,
+        #'KFAC_SODPP_MMC_notMNIST':KFAC_SODPP_MMC_notMNIST,
+        #'KFAC_SODPP_MMC_KMNIST':KFAC_SODPP_MMC_KMNIST,
+        #'KFAC_SODPP_AUROC_FMNIST':KFAC_SODPP_AUROC_FMNIST,
+        #'KFAC_SODPP_AUROC_notMNIST':KFAC_SODPP_AUROC_notMNIST,
+        #'KFAC_SODPP_AUROC_KMNIST':KFAC_SODPP_AUROC_KMNIST
     }
     results_df = pd.DataFrame(results_dict)
     RESULTS_PATH = os.getcwd() + "/Experiment_results/MNIST_results.csv"

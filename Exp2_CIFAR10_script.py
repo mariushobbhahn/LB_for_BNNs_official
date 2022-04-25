@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from laplace import Laplace
+import utils.scoring as scoring
 
 from utils.load_not_MNIST import notMNIST
 import argparse
@@ -74,7 +75,7 @@ def main():
     CIFAR10_model.eval()
     
     targets_CIFAR10 = CIFAR10_testset.targets
-    targets_CIFAR100 = CIFAR100_test.targets
+    targets_CIFAR100 = torch.tensor(CIFAR100_test.targets).clip(0, 9).numpy()
     targets_SVHN = []
     for x,y in SVHN_test_loader:
         targets_SVHN.append(y)
@@ -90,6 +91,12 @@ def main():
     MAP_MMC_SVHN = []
     MAP_AUROC_CIFAR100 = []
     MAP_AUROC_SVHN = []
+    MAP_NLL_in = []
+    MAP_NLL_CIFAR100 = []
+    MAP_NLL_SVHN = []
+    MAP_ECE_in = []
+    MAP_ECE_CIFAR100 = []
+    MAP_ECE_SVHN = []
     
     # Diag samples
     Diag_samples_MMC_in = []
@@ -97,6 +104,12 @@ def main():
     Diag_samples_MMC_SVHN = []
     Diag_samples_AUROC_CIFAR100 = []
     Diag_samples_AUROC_SVHN = []
+    Diag_samples_NLL_in = []
+    Diag_samples_NLL_CIFAR100 = []
+    Diag_samples_NLL_SVHN = []
+    Diag_samples_ECE_in = []
+    Diag_samples_ECE_CIFAR100 = []
+    Diag_samples_ECE_SVHN = []
 
     # KFAC samples
     KFAC_samples_MMC_in = []
@@ -104,6 +117,12 @@ def main():
     KFAC_samples_MMC_SVHN = []
     KFAC_samples_AUROC_CIFAR100 = []
     KFAC_samples_AUROC_SVHN = []
+    KFAC_samples_NLL_in = []
+    KFAC_samples_NLL_CIFAR100 = []
+    KFAC_samples_NLL_SVHN = []
+    KFAC_samples_ECE_in = []
+    KFAC_samples_ECE_CIFAR100 = []
+    KFAC_samples_ECE_SVHN = []
 
     # Diag LB
     Diag_LB_MMC_in = []
@@ -111,6 +130,12 @@ def main():
     Diag_LB_MMC_SVHN = []
     Diag_LB_AUROC_CIFAR100 = []
     Diag_LB_AUROC_SVHN = []
+    Diag_LB_NLL_in = []
+    Diag_LB_NLL_CIFAR100 = []
+    Diag_LB_NLL_SVHN = []
+    Diag_LB_ECE_in = []
+    Diag_LB_ECE_CIFAR100 = []
+    Diag_LB_ECE_SVHN = []
     
     # KFAC LB
     KFAC_LB_MMC_in = []
@@ -118,6 +143,12 @@ def main():
     KFAC_LB_MMC_SVHN = []
     KFAC_LB_AUROC_CIFAR100 = []
     KFAC_LB_AUROC_SVHN = []
+    KFAC_LB_NLL_in = []
+    KFAC_LB_NLL_CIFAR100 = []
+    KFAC_LB_NLL_SVHN = []
+    KFAC_LB_ECE_in = []
+    KFAC_LB_ECE_CIFAR100 = []
+    KFAC_LB_ECE_SVHN = []
 
     # Diag LB normalized
     Diag_LB_norm_MMC_in = []
@@ -125,6 +156,12 @@ def main():
     Diag_LB_norm_MMC_SVHN = []
     Diag_LB_norm_AUROC_CIFAR100 = []
     Diag_LB_norm_AUROC_SVHN = []
+    Diag_LB_norm_NLL_in = []
+    Diag_LB_norm_NLL_CIFAR100 = []
+    Diag_LB_norm_NLL_SVHN = []
+    Diag_LB_norm_ECE_in = []
+    Diag_LB_norm_ECE_CIFAR100 = []
+    Diag_LB_norm_ECE_SVHN = []
     
     # KFAC LB normalized
     KFAC_LB_norm_MMC_in = []
@@ -132,21 +169,40 @@ def main():
     KFAC_LB_norm_MMC_SVHN = []
     KFAC_LB_norm_AUROC_CIFAR100 = []
     KFAC_LB_norm_AUROC_SVHN = []
+    KFAC_LB_norm_NLL_in = []
+    KFAC_LB_norm_NLL_CIFAR100 = []
+    KFAC_LB_norm_NLL_SVHN = []
+    KFAC_LB_norm_ECE_in = []
+    KFAC_LB_norm_ECE_CIFAR100 = []
+    KFAC_LB_norm_ECE_SVHN = []
     
-    # Diag EMK
-    Diag_EMK_MMC_in = []
-    Diag_EMK_MMC_CIFAR100 = []
-    Diag_EMK_MMC_SVHN = []
-    Diag_EMK_AUROC_CIFAR100 = []
-    Diag_EMK_AUROC_SVHN = []
+    # Diag PROBIT
+    Diag_PROBIT_MMC_in = []
+    Diag_PROBIT_MMC_CIFAR100 = []
+    Diag_PROBIT_MMC_SVHN = []
+    Diag_PROBIT_AUROC_CIFAR100 = []
+    Diag_PROBIT_AUROC_SVHN = []
+    Diag_PROBIT_NLL_in = []
+    Diag_PROBIT_NLL_CIFAR100 = []
+    Diag_PROBIT_NLL_SVHN = []
+    Diag_PROBIT_ECE_in = []
+    Diag_PROBIT_ECE_CIFAR100 = []
+    Diag_PROBIT_ECE_SVHN = []
     
-    # KFAC EMK
-    KFAC_EMK_MMC_in = []
-    KFAC_EMK_MMC_CIFAR100 = []
-    KFAC_EMK_MMC_SVHN = []
-    KFAC_EMK_AUROC_CIFAR100 = []
-    KFAC_EMK_AUROC_SVHN = []
+    # KFAC PROBIT
+    KFAC_PROBIT_MMC_in = []
+    KFAC_PROBIT_MMC_CIFAR100 = []
+    KFAC_PROBIT_MMC_SVHN = []
+    KFAC_PROBIT_AUROC_CIFAR100 = []
+    KFAC_PROBIT_AUROC_SVHN = []
+    KFAC_PROBIT_NLL_in = []
+    KFAC_PROBIT_NLL_CIFAR100 = []
+    KFAC_PROBIT_NLL_SVHN = []
+    KFAC_PROBIT_ECE_in = []
+    KFAC_PROBIT_ECE_CIFAR100 = []
+    KFAC_PROBIT_ECE_SVHN = []
     
+    """
     # Diag SODPP
     Diag_SODPP_MMC_in = []
     Diag_SODPP_MMC_CIFAR100 = []
@@ -160,6 +216,7 @@ def main():
     KFAC_SODPP_MMC_SVHN = []
     KFAC_SODPP_AUROC_CIFAR100 = []
     KFAC_SODPP_AUROC_SVHN = []
+    """
     
     # run experiments
     for s in range(args.num_seeds):
@@ -198,6 +255,12 @@ def main():
         MAP_MMC_SVHN.append(MMC_out_SVHN_MAP)
         MAP_AUROC_CIFAR100.append(auroc_out_CIFAR100_MAP)
         MAP_AUROC_SVHN.append(auroc_out_SVHN_MAP)
+        MAP_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_MAP)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        MAP_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_MAP)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        MAP_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_MAP)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        MAP_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_MAP))
+        MAP_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_MAP))
+        MAP_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_MAP))
 
 
         #Diag samples
@@ -214,6 +277,13 @@ def main():
         Diag_samples_MMC_SVHN.append(MMC_out_SVHN_D)
         Diag_samples_AUROC_CIFAR100.append(auroc_out_CIFAR100_D)
         Diag_samples_AUROC_SVHN.append(auroc_out_SVHN_D)
+        Diag_samples_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_D)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        Diag_samples_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_D)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        Diag_samples_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_D)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        Diag_samples_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_D))
+        Diag_samples_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_D))
+        Diag_samples_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_D))
+
         
         #KFAC samples
         CIFAR10_test_in_KFAC = predict_samples(la_kron, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
@@ -230,6 +300,13 @@ def main():
         KFAC_samples_MMC_SVHN.append(MMC_out_SVHN_K)
         KFAC_samples_AUROC_CIFAR100.append(auroc_out_CIFAR100_K)
         KFAC_samples_AUROC_SVHN.append(auroc_out_SVHN_K)
+        KFAC_samples_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_KFAC)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        KFAC_samples_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_KFAC)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        KFAC_samples_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_KFAC)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        KFAC_samples_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_KFAC))
+        KFAC_samples_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_KFAC))
+        KFAC_samples_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_KFAC))
+
         
         #LB diag
         CIFAR10_test_in_LB_D = predict_LB(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
@@ -245,6 +322,13 @@ def main():
         Diag_LB_MMC_SVHN.append(MMC_out_SVHN_LB)
         Diag_LB_AUROC_CIFAR100.append(auroc_out_CIFAR100_LB)
         Diag_LB_AUROC_SVHN.append(auroc_out_SVHN_LB)
+        Diag_LB_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_LB_D)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        Diag_LB_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_LB_D)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        Diag_LB_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_LB_D)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        Diag_LB_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_D))
+        Diag_LB_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_D))
+        Diag_LB_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_D))
+
         
         #LB KFAC
         CIFAR10_test_in_LB_KFAC = predict_LB(la_kron, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
@@ -260,6 +344,13 @@ def main():
         KFAC_LB_MMC_SVHN.append(MMC_out_SVHN_LB_KFAC)
         KFAC_LB_AUROC_CIFAR100.append(auroc_out_CIFAR100_LB_KFAC)
         KFAC_LB_AUROC_SVHN.append(auroc_out_SVHN_LB_KFAC)
+        KFAC_LB_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_LB_KFAC)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        KFAC_LB_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_LB_KFAC)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        KFAC_LB_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_LB_KFAC)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        KFAC_LB_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_KFAC))
+        KFAC_LB_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_KFAC))
+        KFAC_LB_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_KFAC))
+
 
         #LB diag normalized
         CIFAR10_test_in_LB_Dn = predict_LB_norm(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
@@ -275,7 +366,14 @@ def main():
         Diag_LB_norm_MMC_SVHN.append(MMC_out_SVHN_LB)
         Diag_LB_norm_AUROC_CIFAR100.append(auroc_out_CIFAR100_LB)
         Diag_LB_norm_AUROC_SVHN.append(auroc_out_SVHN_LB)
-        
+        Diag_LB_norm_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_LB_Dn)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        Diag_LB_norm_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_LB_Dn)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        Diag_LB_norm_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_LB_Dn)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        Diag_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_Dn))
+        Diag_LB_norm_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_Dn))
+        Diag_LB_norm_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_Dn))
+       
+
         #LB KFAC normalized
         CIFAR10_test_in_LB_KFACn = predict_LB_norm(la_kron, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
         CIFAR10_test_out_CIFAR100_LB_KFACn = predict_LB_norm(la_kron, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
@@ -290,37 +388,59 @@ def main():
         KFAC_LB_norm_MMC_SVHN.append(MMC_out_SVHN_LB_KFAC)
         KFAC_LB_norm_AUROC_CIFAR100.append(auroc_out_CIFAR100_LB_KFAC)
         KFAC_LB_norm_AUROC_SVHN.append(auroc_out_SVHN_LB_KFAC)
+        KFAC_LB_norm_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_LB_KFACn)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        KFAC_LB_norm_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_LB_KFACn)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        KFAC_LB_norm_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_LB_KFACn)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        KFAC_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_KFACn))
+        KFAC_LB_norm_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_KFACn))
+        KFAC_LB_norm_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_KFACn))
+
 
         #Extended MacKay diag
-        CIFAR10_test_in_EMK_D = predict_extended_MacKay(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
-        CIFAR10_test_out_CIFAR100_EMK_D = predict_extended_MacKay(la_diag, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
-        CIFAR10_test_out_SVHN_EMK_D = predict_extended_MacKay(la_diag, SVHN_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_in_PROBIT_D = predict_extended_MacKay(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_out_CIFAR100_PROBIT_D = predict_extended_MacKay(la_diag, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_out_SVHN_PROBIT_D = predict_extended_MacKay(la_diag, SVHN_test_loader, timing=False, device=device).cpu().numpy()
         
-        acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK = get_in_dist_values(CIFAR10_test_in_EMK_D, targets_CIFAR10)
-        acc_out_CIFAR100_EMK, prob_correct_out_CIFAR100_EMK, ent_out_CIFAR100_EMK, MMC_out_CIFAR100_EMK, auroc_out_CIFAR100_EMK = get_out_dist_values(CIFAR10_test_in_EMK_D, CIFAR10_test_out_CIFAR100_EMK_D, targets_CIFAR100)
-        acc_out_SVHN_EMK, prob_correct_out_SVHN_EMK, ent_out_SVHN_EMK, MMC_out_SVHN_EMK, auroc_out_SVHN_EMK = get_out_dist_values(CIFAR10_test_in_EMK_D, CIFAR10_test_out_SVHN_EMK_D, targets_SVHN)
+        acc_in_PROBIT, prob_correct_in_PROBIT, ent_in_PROBIT, MMC_in_PROBIT = get_in_dist_values(CIFAR10_test_in_PROBIT_D, targets_CIFAR10)
+        acc_out_CIFAR100_PROBIT, prob_correct_out_CIFAR100_PROBIT, ent_out_CIFAR100_PROBIT, MMC_out_CIFAR100_PROBIT, auroc_out_CIFAR100_PROBIT = get_out_dist_values(CIFAR10_test_in_PROBIT_D, CIFAR10_test_out_CIFAR100_PROBIT_D, targets_CIFAR100)
+        acc_out_SVHN_PROBIT, prob_correct_out_SVHN_PROBIT, ent_out_SVHN_PROBIT, MMC_out_SVHN_PROBIT, auroc_out_SVHN_PROBIT = get_out_dist_values(CIFAR10_test_in_PROBIT_D, CIFAR10_test_out_SVHN_PROBIT_D, targets_SVHN)
         
-        Diag_EMK_MMC_in.append(MMC_in_EMK)
-        Diag_EMK_MMC_CIFAR100.append(MMC_out_CIFAR100_EMK)
-        Diag_EMK_MMC_SVHN.append(MMC_out_SVHN_EMK)
-        Diag_EMK_AUROC_CIFAR100.append(auroc_out_CIFAR100_EMK)
-        Diag_EMK_AUROC_SVHN.append(auroc_out_SVHN_EMK)
+        Diag_PROBIT_MMC_in.append(MMC_in_PROBIT)
+        Diag_PROBIT_MMC_CIFAR100.append(MMC_out_CIFAR100_PROBIT)
+        Diag_PROBIT_MMC_SVHN.append(MMC_out_SVHN_PROBIT)
+        Diag_PROBIT_AUROC_CIFAR100.append(auroc_out_CIFAR100_PROBIT)
+        Diag_PROBIT_AUROC_SVHN.append(auroc_out_SVHN_PROBIT)
+        Diag_PROBIT_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_PROBIT_D)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        Diag_PROBIT_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_PROBIT_D)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        Diag_PROBIT_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_PROBIT_D)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        Diag_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_PROBIT_D))
+        Diag_PROBIT_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_PROBIT_D))
+        Diag_PROBIT_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_PROBIT_D))
+
         
         #Extended MacKay KFAC
-        CIFAR10_test_in_EMK_K = predict_extended_MacKay(la_kron, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
-        CIFAR10_test_out_CIFAR100_EMK_K = predict_extended_MacKay(la_kron, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
-        CIFAR10_test_out_SVHN_EMK_K = predict_extended_MacKay(la_kron, SVHN_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_in_PROBIT_K = predict_extended_MacKay(la_kron, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_out_CIFAR100_PROBIT_K = predict_extended_MacKay(la_kron, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
+        CIFAR10_test_out_SVHN_PROBIT_K = predict_extended_MacKay(la_kron, SVHN_test_loader, timing=False, device=device).cpu().numpy()
         
-        acc_in_EMK, prob_correct_in_EMK, ent_in_EMK, MMC_in_EMK = get_in_dist_values(CIFAR10_test_in_EMK_K, targets_CIFAR10)
-        acc_out_CIFAR100_EMK, prob_correct_out_CIFAR100_EMK, ent_out_CIFAR100_EMK, MMC_out_CIFAR100_EMK, auroc_out_CIFAR100_EMK = get_out_dist_values(CIFAR10_test_in_EMK_K, CIFAR10_test_out_CIFAR100_EMK_K, targets_CIFAR100)
-        acc_out_SVHN_EMK, prob_correct_out_SVHN_EMK, ent_out_SVHN_EMK, MMC_out_SVHN_EMK, auroc_out_SVHN_EMK = get_out_dist_values(CIFAR10_test_in_EMK_K, CIFAR10_test_out_SVHN_EMK_K, targets_SVHN)
+        acc_in_PROBIT, prob_correct_in_PROBIT, ent_in_PROBIT, MMC_in_PROBIT = get_in_dist_values(CIFAR10_test_in_PROBIT_K, targets_CIFAR10)
+        acc_out_CIFAR100_PROBIT, prob_correct_out_CIFAR100_PROBIT, ent_out_CIFAR100_PROBIT, MMC_out_CIFAR100_PROBIT, auroc_out_CIFAR100_PROBIT = get_out_dist_values(CIFAR10_test_in_PROBIT_K, CIFAR10_test_out_CIFAR100_PROBIT_K, targets_CIFAR100)
+        acc_out_SVHN_PROBIT, prob_correct_out_SVHN_PROBIT, ent_out_SVHN_PROBIT, MMC_out_SVHN_PROBIT, auroc_out_SVHN_PROBIT = get_out_dist_values(CIFAR10_test_in_PROBIT_K, CIFAR10_test_out_SVHN_PROBIT_K, targets_SVHN)
         
-        KFAC_EMK_MMC_in.append(MMC_in_EMK)
-        KFAC_EMK_MMC_CIFAR100.append(MMC_out_CIFAR100_EMK)
-        KFAC_EMK_MMC_SVHN.append(MMC_out_SVHN_EMK)
-        KFAC_EMK_AUROC_CIFAR100.append(auroc_out_CIFAR100_EMK)
-        KFAC_EMK_AUROC_SVHN.append(auroc_out_SVHN_EMK)
+        KFAC_PROBIT_MMC_in.append(MMC_in_PROBIT)
+        KFAC_PROBIT_MMC_CIFAR100.append(MMC_out_CIFAR100_PROBIT)
+        KFAC_PROBIT_MMC_SVHN.append(MMC_out_SVHN_PROBIT)
+        KFAC_PROBIT_AUROC_CIFAR100.append(auroc_out_CIFAR100_PROBIT)
+        KFAC_PROBIT_AUROC_SVHN.append(auroc_out_SVHN_PROBIT)
+        KFAC_PROBIT_NLL_in.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_in_PROBIT_K)).log_prob(torch.tensor(targets_CIFAR10)).mean().item())
+        KFAC_PROBIT_NLL_CIFAR100.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_CIFAR100_PROBIT_K)).log_prob(torch.tensor(targets_CIFAR100)).mean().item())
+        KFAC_PROBIT_NLL_SVHN.append(-torch.distributions.Categorical(torch.tensor(CIFAR10_test_out_SVHN_PROBIT_K)).log_prob(torch.tensor(targets_SVHN)).mean().item())
+        KFAC_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_PROBIT_K))
+        KFAC_PROBIT_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_PROBIT_K))
+        KFAC_PROBIT_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_PROBIT_K))
+
         
+        """
         #SODPP diag
         CIFAR10_test_in_SODPP_D = predict_second_order_dpp(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
         CIFAR10_test_out_CIFAR100_SODPP_D = predict_second_order_dpp(la_diag, CIFAR100_test_loader, timing=False, device=device).cpu().numpy()
@@ -350,6 +470,7 @@ def main():
         KFAC_SODPP_MMC_SVHN.append(MMC_out_SVHN_SODPP)
         KFAC_SODPP_AUROC_CIFAR100.append(auroc_out_CIFAR100_SODPP)
         KFAC_SODPP_AUROC_SVHN.append(auroc_out_SVHN_SODPP)
+        """
         
     #### save results
     results_dict = {
@@ -358,56 +479,110 @@ def main():
         'MAP_MMC_SVHN':MAP_MMC_SVHN,
         'MAP_AUROC_CIFAR100':MAP_AUROC_CIFAR100,
         'MAP_AUROC_SVHN':MAP_AUROC_SVHN,
+        'MAP_NLL_in':MAP_NLL_in,
+        'MAP_NLL_CIFAR100':MAP_NLL_CIFAR100,
+        'MAP_NLL_SVHN':MAP_NLL_SVHN,
+        'MAP_ECE_in':MAP_ECE_in,
+        'MAP_ECE_CIFAR100':MAP_ECE_CIFAR100,
+        'MAP_ECE_SVHN':MAP_ECE_SVHN,
         'Diag_samples_MMC_in':Diag_samples_MMC_in,
         'Diag_samples_MMC_CIFAR100':Diag_samples_MMC_CIFAR100,
         'Diag_samples_MMC_SVHN':Diag_samples_MMC_SVHN,
         'Diag_samples_AUROC_CIFAR100':Diag_samples_AUROC_CIFAR100,
         'Diag_samples_AUROC_SVHN':Diag_samples_AUROC_SVHN,
+        'Diag_samples_NLL_in':Diag_samples_NLL_in,
+        'Diag_samples_NLL_CIFAR100':Diag_samples_NLL_CIFAR100,
+        'Diag_samples_NLL_SVHN':Diag_samples_NLL_SVHN,
+        'Diag_samples_ECE_in':Diag_samples_ECE_in,
+        'Diag_samples_ECE_CIFAR100':Diag_samples_ECE_CIFAR100,
+        'Diag_samples_ECE_SVHN':Diag_samples_ECE_SVHN,
         'KFAC_samples_MMC_in':KFAC_samples_MMC_in,
         'KFAC_samples_MMC_CIFAR100':KFAC_samples_MMC_CIFAR100,
         'KFAC_samples_MMC_SVHN':KFAC_samples_MMC_SVHN,
         'KFAC_samples_AUROC_CIFAR100':KFAC_samples_AUROC_CIFAR100,
         'KFAC_samples_AUROC_SVHN':KFAC_samples_AUROC_SVHN,
+        'KFAC_samples_NLL_in':KFAC_samples_NLL_in,
+        'KFAC_samples_NLL_CIFAR100':KFAC_samples_NLL_CIFAR100,
+        'KFAC_samples_NLL_SVHN':KFAC_samples_NLL_SVHN,
+        'KFAC_samples_ECE_in':KFAC_samples_ECE_in,
+        'KFAC_samples_ECE_CIFAR100':KFAC_samples_ECE_CIFAR100,
+        'KFAC_samples_ECE_SVHN':KFAC_samples_ECE_SVHN,
         'Diag_LB_MMC_in':Diag_LB_MMC_in,
         'Diag_LB_MMC_CIFAR100':Diag_LB_MMC_CIFAR100,
         'Diag_LB_MMC_SVHN':Diag_LB_MMC_SVHN,
         'Diag_LB_AUROC_CIFAR100':Diag_LB_AUROC_CIFAR100,
         'Diag_LB_AUROC_SVHN':Diag_LB_AUROC_SVHN,
+        'Diag_LB_NLL_in':Diag_LB_NLL_in,
+        'Diag_LB_NLL_CIFAR100':Diag_LB_NLL_CIFAR100,
+        'Diag_LB_NLL_SVHN':Diag_LB_NLL_SVHN,
+        'Diag_LB_ECE_in':Diag_LB_ECE_in,
+        'Diag_LB_ECE_CIFAR100':Diag_LB_ECE_CIFAR100,
+        'Diag_LB_ECE_SVHN':Diag_LB_ECE_SVHN,
         'KFAC_LB_MMC_in':KFAC_LB_MMC_in,
         'KFAC_LB_MMC_CIFAR100':KFAC_LB_MMC_CIFAR100,
         'KFAC_LB_MMC_SVHN':KFAC_LB_MMC_SVHN,
         'KFAC_LB_AUROC_CIFAR100':KFAC_LB_AUROC_CIFAR100,
         'KFAC_LB_AUROC_SVHN':KFAC_LB_AUROC_SVHN,
+        'KFAC_LB_NLL_in':KFAC_LB_NLL_in,
+        'KFAC_LB_NLL_CIFAR100':KFAC_LB_NLL_CIFAR100,
+        'KFAC_LB_NLL_SVHN':KFAC_LB_NLL_SVHN,
+        'KFAC_LB_ECE_in':KFAC_LB_ECE_in,
+        'KFAC_LB_ECE_CIFAR100':KFAC_LB_ECE_CIFAR100,
+        'KFAC_LB_ECE_SVHN':KFAC_LB_ECE_SVHN,
         'Diag_LB_norm_MMC_in':Diag_LB_norm_MMC_in,
         'Diag_LB_norm_MMC_CIFAR100':Diag_LB_norm_MMC_CIFAR100,
         'Diag_LB_norm_MMC_SVHN':Diag_LB_norm_MMC_SVHN,
         'Diag_LB_norm_AUROC_CIFAR100':Diag_LB_norm_AUROC_CIFAR100,
         'Diag_LB_norm_AUROC_SVHN':Diag_LB_norm_AUROC_SVHN,
+        'Diag_LB_norm_NLL_in':Diag_LB_norm_NLL_in,
+        'Diag_LB_norm_NLL_CIFAR100':Diag_LB_norm_NLL_CIFAR100,
+        'Diag_LB_norm_NLL_SVHN':Diag_LB_norm_NLL_SVHN,
+        'Diag_LB_norm_ECE_in':Diag_LB_norm_ECE_in,
+        'Diag_LB_norm_ECE_CIFAR100':Diag_LB_norm_ECE_CIFAR100,
+        'Diag_LB_norm_ECE_SVHN':Diag_LB_norm_ECE_SVHN,
         'KFAC_LB_norm_MMC_in':KFAC_LB_norm_MMC_in,
         'KFAC_LB_norm_MMC_CIFAR100':KFAC_LB_norm_MMC_CIFAR100,
         'KFAC_LB_norm_MMC_SVHN':KFAC_LB_norm_MMC_SVHN,
         'KFAC_LB_norm_AUROC_CIFAR100':KFAC_LB_norm_AUROC_CIFAR100,
         'KFAC_LB_norm_AUROC_SVHN':KFAC_LB_norm_AUROC_SVHN,
-        'Diag_EMK_MMC_in':Diag_EMK_MMC_in,
-        'Diag_EMK_MMC_CIFAR100':Diag_EMK_MMC_CIFAR100,
-        'Diag_EMK_MMC_SVHN':Diag_EMK_MMC_SVHN,
-        'Diag_EMK_AUROC_CIFAR100':Diag_EMK_AUROC_CIFAR100,
-        'Diag_EMK_AUROC_SVHN':Diag_EMK_AUROC_SVHN,
-        'KFAC_EMK_MMC_in':KFAC_EMK_MMC_in,
-        'KFAC_EMK_MMC_CIFAR100':KFAC_EMK_MMC_CIFAR100,
-        'KFAC_EMK_MMC_SVHN':KFAC_EMK_MMC_SVHN,
-        'KFAC_EMK_AUROC_CIFAR100':KFAC_EMK_AUROC_CIFAR100,
-        'KFAC_EMK_AUROC_SVHN':KFAC_EMK_AUROC_SVHN,
-        'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
-        'Diag_SODPP_MMC_CIFAR100':Diag_SODPP_MMC_CIFAR100,
-        'Diag_SODPP_MMC_SVHN':Diag_SODPP_MMC_SVHN,
-        'Diag_SODPP_AUROC_CIFAR100':Diag_SODPP_AUROC_CIFAR100,
-        'Diag_SODPP_AUROC_SVHN':Diag_SODPP_AUROC_SVHN,
-        'KFAC_SODPP_MMC_in':KFAC_SODPP_MMC_in,
-        'KFAC_SODPP_MMC_CIFAR100':KFAC_SODPP_MMC_CIFAR100,
-        'KFAC_SODPP_MMC_SVHN':KFAC_SODPP_MMC_SVHN,
-        'KFAC_SODPP_AUROC_CIFAR100':KFAC_SODPP_AUROC_CIFAR100,
-        'KFAC_SODPP_AUROC_SVHN':KFAC_SODPP_AUROC_SVHN
+        'KFAC_LB_norm_NLL_in':KFAC_LB_norm_NLL_in,
+        'KFAC_LB_norm_NLL_CIFAR100':KFAC_LB_norm_NLL_CIFAR100,
+        'KFAC_LB_norm_NLL_SVHN':KFAC_LB_norm_NLL_SVHN,
+        'KFAC_LB_norm_ECE_in':KFAC_LB_norm_ECE_in,
+        'KFAC_LB_norm_ECE_CIFAR100':KFAC_LB_norm_ECE_CIFAR100,
+        'KFAC_LB_norm_ECE_SVHN':KFAC_LB_norm_ECE_SVHN,
+        'Diag_PROBIT_MMC_in':Diag_PROBIT_MMC_in,
+        'Diag_PROBIT_MMC_CIFAR100':Diag_PROBIT_MMC_CIFAR100,
+        'Diag_PROBIT_MMC_SVHN':Diag_PROBIT_MMC_SVHN,
+        'Diag_PROBIT_AUROC_CIFAR100':Diag_PROBIT_AUROC_CIFAR100,
+        'Diag_PROBIT_AUROC_SVHN':Diag_PROBIT_AUROC_SVHN,
+        'Diag_PROBIT_NLL_in':Diag_PROBIT_NLL_in,
+        'Diag_PROBIT_NLL_CIFAR100':Diag_PROBIT_NLL_CIFAR100,
+        'Diag_PROBIT_NLL_SVHN':Diag_PROBIT_NLL_SVHN,
+        'Diag_PROBIT_ECE_in':Diag_PROBIT_ECE_in,
+        'Diag_PROBIT_ECE_CIFAR100':Diag_PROBIT_ECE_CIFAR100,
+        'Diag_PROBIT_ECE_SVHN':Diag_PROBIT_ECE_SVHN,
+        'KFAC_PROBIT_MMC_in':KFAC_PROBIT_MMC_in,
+        'KFAC_PROBIT_MMC_CIFAR100':KFAC_PROBIT_MMC_CIFAR100,
+        'KFAC_PROBIT_MMC_SVHN':KFAC_PROBIT_MMC_SVHN,
+        'KFAC_PROBIT_AUROC_CIFAR100':KFAC_PROBIT_AUROC_CIFAR100,
+        'KFAC_PROBIT_AUROC_SVHN':KFAC_PROBIT_AUROC_SVHN,
+        'KFAC_PROBIT_NLL_in':KFAC_PROBIT_NLL_in,
+        'KFAC_PROBIT_NLL_CIFAR100':KFAC_PROBIT_NLL_CIFAR100,
+        'KFAC_PROBIT_NLL_SVHN':KFAC_PROBIT_NLL_SVHN,
+        'KFAC_PROBIT_ECE_in':KFAC_PROBIT_ECE_in,
+        'KFAC_PROBIT_ECE_CIFAR100':KFAC_PROBIT_ECE_CIFAR100,
+        'KFAC_PROBIT_ECE_SVHN':KFAC_PROBIT_ECE_SVHN,
+        #'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
+        #'Diag_SODPP_MMC_CIFAR100':Diag_SODPP_MMC_CIFAR100,
+        #'Diag_SODPP_MMC_SVHN':Diag_SODPP_MMC_SVHN,
+        #'Diag_SODPP_AUROC_CIFAR100':Diag_SODPP_AUROC_CIFAR100,
+        #'Diag_SODPP_AUROC_SVHN':Diag_SODPP_AUROC_SVHN,
+        #'KFAC_SODPP_MMC_in':KFAC_SODPP_MMC_in,
+        #'KFAC_SODPP_MMC_CIFAR100':KFAC_SODPP_MMC_CIFAR100,
+        #'KFAC_SODPP_MMC_SVHN':KFAC_SODPP_MMC_SVHN,
+        #'KFAC_SODPP_AUROC_CIFAR100':KFAC_SODPP_AUROC_CIFAR100,
+        #'KFAC_SODPP_AUROC_SVHN':KFAC_SODPP_AUROC_SVHN
     }
     results_df = pd.DataFrame(results_dict)
     RESULTS_PATH = os.getcwd() + "/Experiment_results/CIFAR10_results.csv"
