@@ -64,6 +64,20 @@ def predict_LB(laplace_model, data_loader, timing=False, device='cuda'):
         print("time: ", t1 - t0)
     return(torch.cat(py, dim=0))
 
+# probit approximation
+@torch.no_grad()
+def predict_probit(laplace_model, data_loader, timing=False, device='cuda'):
+    
+    py = []
+    t0 = time.process_time()
+    for x, _ in data_loader:
+        x = x.to(device)
+        py.append(laplace_model(x, link_approx='probit').detach())
+    t1 = time.process_time()
+    if timing:
+        print("time: ", t1 - t0)
+    return(torch.cat(py, dim=0))
+
 # apply Laplace Bridge
 @torch.no_grad()
 def predict_LB_norm(laplace_model, data_loader, timing=False, device='cuda'):
@@ -124,6 +138,15 @@ def predict_second_order_dpp(laplace_model, data_loader, timing=False, device='c
 """############ Functions related to calculating and printing the results ############"""
 
 ######## get all the data for in and out of dist samples
+
+def get_fpr95(py_in, py_out):
+    conf_in, conf_out = py_in.max(1), py_out.max(1)
+    tpr = 95
+    perc = np.percentile(conf_in, 100-tpr)
+    fp = np.sum(conf_out >=  perc)
+    fpr = np.sum(conf_out >=  perc)/len(conf_out)
+    return fpr, perc
+
 
 def get_in_dist_values(py_in, targets):
     acc_in = np.mean(np.argmax(py_in, 1) == targets)

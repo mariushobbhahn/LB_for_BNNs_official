@@ -202,44 +202,52 @@ def predict_MAP(model, test_loader, num_samples=1, device='cuda'):
 
 #diagonal sampling of last-layer
 @torch.no_grad()
-def predict_diagonal_sampling(model, test_loader, M_W_post, M_b_post, C_W_post, C_b_post, n_samples, verbose=False, cuda=False, timing=False):
+def predict_diagonal_sampling(model, test_loader, M_W_post, M_b_post, C_W_post, C_b_post, n_samples, verbose=False, cuda=True):
     py = []
     max_len = len(test_loader)
     if timing:
-        time_sum = 0
+        time_sum_fw = 0
+        time_sum_sampling = 0
 
     for batch_idx, (x, y) in enumerate(test_loader):
 
         if cuda:
             x, y = x.cuda(), y.cuda()
 
-        phi = model.features(x)
+        t0_fw = time.time_process()
+        phi = model.phi(x).detach()
 
         mu, Sigma = get_Gaussian_output(phi, M_W_post, M_b_post, C_W_post, C_b_post)
+        #mu, Sigma = mu.cpu(), Sigma.cpu()
+        t1_fw = time.time_process()
 
         post_pred = MultivariateNormal(mu, Sigma)
 
         # MC-integral
-        t0 = time.time()
         py_ = 0
-
+        
+        t0_sampling = time.process_time()
         for _ in range(n_samples):
             f_s = post_pred.rsample()
-            py_ += torch.softmax(f_s, 1)
+            py_ += torch.softmax(f_s, 1).detach()
 
         py_ /= n_samples
         py_ = py_.detach()
+        t1_sampling = time.process_time()
 
         py.append(py_)
-        t1 = time.time()
+        
         if timing:
-            time_sum += (t1 - t0)
+            time_sum_fw += (t1_fw - t0_fw)
+            time_sum_lb += (t1_sampling - t0_sampling)
 
         if verbose:
             print("Batch: {}/{}".format(batch_idx, max_len))
+            
+    if timing:
+        print("total time used for forward pass: {:.05f}".format(time_sum_fw))
+        print("total time used for sampling: {:.05f}".format(time_sum_sampling))
 
-    if timing: print("time used for sampling with {} samples: {}".format(n_samples, time_sum))
-    
     return torch.cat(py, dim=0)
 
 #KFAC sampling of last-layer
@@ -248,22 +256,26 @@ def predict_KFAC_sampling(model, test_loader, M_W_post, M_b_post, U_post, V_post
     py = []
     max_len = len(test_loader)
     if timing:
-        time_sum = 0
+        time_sum_fw = 0
+        time_sum_sampling = 0
 
     for batch_idx, (x, y) in enumerate(test_loader):
 
         if cuda:
             x, y = x.cuda(), y.cuda()
 
+        t0_fw = time.time_process()
         phi = model.features(x).detach()
 
         mu_pred = phi @ M_W_post + M_b_post
         Cov_pred = torch.diag(phi @ V_post @ phi.t()).reshape(-1, 1, 1) * U_post.unsqueeze(0) + B_post.unsqueeze(0)
-
+        t1_fw = time.time_process()
+        
         post_pred = MultivariateNormal(mu_pred, Cov_pred)
+        
 
         # MC-integral
-        t0 = time.time()
+        t0_sampling = time.time_process()
         py_ = 0
 
         for _ in range(n_samples):
@@ -272,11 +284,13 @@ def predict_KFAC_sampling(model, test_loader, M_W_post, M_b_post, U_post, V_post
 
         py_ /= n_samples
         py_ = py_.detach()
+        
 
+        t1_sampling = time.time_process()
         py.append(py_)
-        t1 = time.time()
         if timing:
-            time_sum += (t1 - t0)
+            time_sum_fw += (t1_fw - t0_fw)
+            time_sum_lb += (t1_sampling - t0_sampling)
 
 
         if verbose:
@@ -303,15 +317,15 @@ def predict_LB(model, test_loader, M_W_post, M_b_post, C_W_post, C_b_post, verbo
         if cuda:
             x, y = x.cuda(), y.cuda()
         
-        t0_fw = time.time()
+        t0_fw = time.process_time()
         phi = model.features(x)
 
         mu_pred, Cov_pred = get_Gaussian_output(phi, M_W_post, M_b_post, C_W_post, C_b_post)
-        t1_fw = time.time()
+        t1_fw = time.process_time()
         
-        t0_lb = time.time()
+        t0_lb = time.process_time()
         alpha = get_alpha_from_Normal(mu_pred, Cov_pred).detach()
-        t1_lb = time.time()
+        t1_lb = time.process_time()
         if timing:
             time_sum_fw += (t1_fw - t0_fw)
             time_sum_lb += (t1_lb - t0_lb)
