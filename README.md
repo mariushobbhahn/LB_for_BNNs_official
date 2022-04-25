@@ -1,8 +1,12 @@
 # LB for BNNs
 
+This paper is currently under review. 
+
+<!--
 IMPORTANT: We have found some problems with the LB that we are currently trying to fix. So don't be surprised if you find that it is overconfident in your experiments. We are working on solving it. 
 
 This is the official GitHub repository for the paper "Fast Predictive Uncertainty For Classification Bayesian Deep Networks" by me (Marius Hobbhahn), Agustinus Kristiadi, and Philipp Hennig. The paper can be found on arxiv at: https://arxiv.org/abs/2003.01227. I have also written a <a href='https://www.mariushobbhahn.com/2020-11-03-LB_for_BNNs/'>blog post</a>, which is an easy-to-understand summary of the paper.
+-->
 
 All files are supposed to be stand-alone notebooks so you can look at different experiments independent of each other.
 
@@ -33,4 +37,7 @@ If you want to apply the Laplace Bridge to your own datasets this repository sho
 ## Final Words
 
 I'm always looking for feedback. If you have problems understanding the content don't hesitate to contact me.
+<!--
 If you have any further questions or suggestions about this repo you can write me at marius.hobbhahn[at]gmail.com
+--> 
+This paper is currently under review. However, it shouldn't be hard to find my identity and email address if you want to contact me. 
