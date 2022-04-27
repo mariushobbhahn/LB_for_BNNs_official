@@ -17,6 +17,8 @@ import utils.scoring as scoring
 
 from utils.load_not_MNIST import notMNIST
 import argparse
+from laplace.curvature import AsdlGGN
+from laplace.curvature.backpack import BackPackGGN
 
 #### SETTINGS
 
@@ -24,12 +26,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('-s', '--num_seeds', type=int, default=5)
     p.add_argument('-o', '--out_folder', type=str, default='../Experiments_results/')
+    p.add_argument('-l', '--last_layer', type=bool, default=True)
     args = p.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     cuda_status = torch.cuda.is_available()
     print("device: ", device)
     print("cuda status: ", cuda_status)
+    print("last_layer: ", args.last_layer)
+    print("all_layers: ", not args.last_layer)
 
     ### define network
     class ConvNet(nn.Module):
@@ -140,6 +145,10 @@ def main():
     MAP_ECE_FMNIST = []
     MAP_ECE_notMNIST = []
     MAP_ECE_KMNIST = []
+    MAP_Brier_in = []
+    MAP_Brier_FMNIST = []
+    MAP_Brier_notMNIST = []
+    MAP_Brier_KMNIST = []
     
     # Diag samples
     Diag_samples_MMC_in = []
@@ -157,6 +166,11 @@ def main():
     Diag_samples_ECE_FMNIST = []
     Diag_samples_ECE_notMNIST = []
     Diag_samples_ECE_KMNIST = []
+    Diag_samples_Brier_in = []
+    Diag_samples_Brier_FMNIST = []
+    Diag_samples_Brier_notMNIST = []
+    Diag_samples_Brier_KMNIST = []
+    
     
     # KFAC samples
     KFAC_samples_MMC_in = []
@@ -174,6 +188,10 @@ def main():
     KFAC_samples_ECE_FMNIST = []
     KFAC_samples_ECE_notMNIST = []
     KFAC_samples_ECE_KMNIST = []
+    KFAC_samples_Brier_in = []
+    KFAC_samples_Brier_FMNIST = []
+    KFAC_samples_Brier_notMNIST = []
+    KFAC_samples_Brier_KMNIST = []
 
     # Diag LB
     Diag_LB_MMC_in = []
@@ -191,6 +209,10 @@ def main():
     Diag_LB_ECE_FMNIST = []
     Diag_LB_ECE_notMNIST = []
     Diag_LB_ECE_KMNIST = []
+    Diag_LB_Brier_in = []
+    Diag_LB_Brier_FMNIST = []
+    Diag_LB_Brier_notMNIST = []
+    Diag_LB_Brier_KMNIST = []
     
     # KFAC LB
     KFAC_LB_MMC_in = []
@@ -208,6 +230,10 @@ def main():
     KFAC_LB_ECE_FMNIST = []
     KFAC_LB_ECE_notMNIST = []
     KFAC_LB_ECE_KMNIST = []
+    KFAC_LB_Brier_in = []
+    KFAC_LB_Brier_FMNIST = []
+    KFAC_LB_Brier_notMNIST = []
+    KFAC_LB_Brier_KMNIST = []
 
     # Diag LB normalized
     Diag_LB_norm_MMC_in = []
@@ -225,6 +251,10 @@ def main():
     Diag_LB_norm_ECE_FMNIST = []
     Diag_LB_norm_ECE_notMNIST = []
     Diag_LB_norm_ECE_KMNIST = []
+    Diag_LB_norm_Brier_in = []
+    Diag_LB_norm_Brier_FMNIST = []
+    Diag_LB_norm_Brier_notMNIST = []
+    Diag_LB_norm_Brier_KMNIST = []
     
     # KFAC LB normalized
     KFAC_LB_norm_MMC_in = []
@@ -242,6 +272,10 @@ def main():
     KFAC_LB_norm_ECE_FMNIST = []
     KFAC_LB_norm_ECE_notMNIST = []
     KFAC_LB_norm_ECE_KMNIST = []
+    KFAC_LB_norm_Brier_in = []
+    KFAC_LB_norm_Brier_FMNIST = []
+    KFAC_LB_norm_Brier_notMNIST = []
+    KFAC_LB_norm_Brier_KMNIST = []
     
     # Diag PROBIT
     Diag_PROBIT_MMC_in = []
@@ -259,6 +293,10 @@ def main():
     Diag_PROBIT_ECE_FMNIST = []
     Diag_PROBIT_ECE_notMNIST = []
     Diag_PROBIT_ECE_KMNIST = []
+    Diag_PROBIT_Brier_in = []
+    Diag_PROBIT_Brier_FMNIST = []
+    Diag_PROBIT_Brier_notMNIST = []
+    Diag_PROBIT_Brier_KMNIST = []
     
     # KFAC PROBIT
     KFAC_PROBIT_MMC_in = []
@@ -276,6 +314,10 @@ def main():
     KFAC_PROBIT_ECE_FMNIST = []
     KFAC_PROBIT_ECE_notMNIST = []
     KFAC_PROBIT_ECE_KMNIST = []
+    KFAC_PROBIT_Brier_in = []
+    KFAC_PROBIT_Brier_FMNIST = []
+    KFAC_PROBIT_Brier_notMNIST = []
+    KFAC_PROBIT_Brier_KMNIST = []
     
     """
     # Diag SODPP
@@ -325,14 +367,16 @@ def main():
         torch.backends.cudnn.benchmark = False
         
         la_diag = Laplace(mnist_model, 'classification', 
-                     subset_of_weights='last_layer', 
+                     subset_of_weights='last_layer' if args.last_layer else "all", 
                      hessian_structure='diag',
+                     backend=BackPackGGN if args.last_layer else AsdlGGN,
                      prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay
         la_diag.fit(MNIST_train_loader)
         
         la_kron = Laplace(mnist_model, 'classification', 
-                     subset_of_weights='last_layer', 
+                     subset_of_weights='last_layer' if args.last_layer else "all", 
                      hessian_structure='kron',
+                     backend=BackPackGGN if args.last_layer else AsdlGGN,
                      prior_precision=5e-4) # 5e-4 # Choose prior precision according to weight decay
         la_kron.fit(MNIST_train_loader)
 
@@ -362,7 +406,10 @@ def main():
         MAP_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_MAP))
         MAP_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_MAP))
         MAP_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_MAP))
-
+        MAP_Brier_in.append(get_brier(MNIST_test_in_MAP, targets, n_classes=10))
+        MAP_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_MAP, targets_FMNIST, n_classes=10))
+        MAP_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_MAP, targets_notMNIST, n_classes=10))
+        MAP_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_MAP, targets_KMNIST, n_classes=10))
 
 
         #Diag samples
@@ -391,6 +438,11 @@ def main():
         Diag_samples_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_D))
         Diag_samples_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_D))
         Diag_samples_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_D))
+        Diag_samples_Brier_in.append(get_brier(MNIST_test_in_D, targets, n_classes=10))
+        Diag_samples_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_D, targets_FMNIST, n_classes=10))
+        Diag_samples_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_D, targets_notMNIST, n_classes=10))
+        Diag_samples_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_D, targets_KMNIST, n_classes=10))
+
     
             
         #KFAC samples
@@ -420,6 +472,11 @@ def main():
         KFAC_samples_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_KFAC))
         KFAC_samples_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_KFAC))
         KFAC_samples_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_KFAC))
+        KFAC_samples_Brier_in.append(get_brier(MNIST_test_in_KFAC, targets, n_classes=10))
+        KFAC_samples_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_KFAC, targets_FMNIST, n_classes=10))
+        KFAC_samples_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_KFAC, targets_notMNIST, n_classes=10))
+        KFAC_samples_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_KFAC, targets_KMNIST, n_classes=10))
+
 
         
         #LB diag
@@ -448,6 +505,10 @@ def main():
         Diag_LB_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_D))
         Diag_LB_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_D))
         Diag_LB_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_D))
+        Diag_LB_Brier_in.append(get_brier(MNIST_test_in_LB_D, targets, n_classes=10))
+        Diag_LB_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_LB_D, targets_FMNIST, n_classes=10))
+        Diag_LB_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_LB_D, targets_notMNIST, n_classes=10))
+        Diag_LB_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_LB_D, targets_KMNIST, n_classes=10))
 
         
         #LB KFAC
@@ -476,6 +537,10 @@ def main():
         KFAC_LB_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_KFAC))
         KFAC_LB_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_KFAC))
         KFAC_LB_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_KFAC))
+        KFAC_LB_Brier_in.append(get_brier(MNIST_test_in_LB_KFAC, targets, n_classes=10))
+        KFAC_LB_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_LB_KFAC, targets_FMNIST, n_classes=10))
+        KFAC_LB_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_LB_KFAC, targets_notMNIST, n_classes=10))
+        KFAC_LB_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_LB_KFAC, targets_KMNIST, n_classes=10))
 
 
         #LB diag normalized
@@ -504,6 +569,10 @@ def main():
         Diag_LB_norm_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_Dn))
         Diag_LB_norm_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_Dn))
         Diag_LB_norm_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_Dn))
+        Diag_LB_norm_Brier_in.append(get_brier(MNIST_test_in_LB_Dn, targets, n_classes=10))
+        Diag_LB_norm_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_LB_Dn, targets_FMNIST, n_classes=10))
+        Diag_LB_norm_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_LB_Dn, targets_notMNIST, n_classes=10))
+        Diag_LB_norm_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_LB_Dn, targets_KMNIST, n_classes=10))
 
         
         #LB KFAC normalized
@@ -532,6 +601,11 @@ def main():
         KFAC_LB_norm_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_LB_KFACn))
         KFAC_LB_norm_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_LB_KFACn))
         KFAC_LB_norm_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_LB_KFACn))
+        KFAC_LB_norm_Brier_in.append(get_brier(MNIST_test_in_LB_KFACn, targets, n_classes=10))
+        KFAC_LB_norm_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_LB_KFACn, targets_FMNIST, n_classes=10))
+        KFAC_LB_norm_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_LB_KFACn, targets_notMNIST, n_classes=10))
+        KFAC_LB_norm_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_LB_KFACn, targets_KMNIST, n_classes=10))
+        
 
         
         #Probit diag
@@ -560,6 +634,11 @@ def main():
         Diag_PROBIT_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_PROBIT_D))
         Diag_PROBIT_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_PROBIT_D))
         Diag_PROBIT_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_PROBIT_D))
+        Diag_PROBIT_Brier_in.append(get_brier(MNIST_test_in_PROBIT_D, targets, n_classes=10))
+        Diag_PROBIT_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_PROBIT_D, targets_FMNIST, n_classes=10))
+        Diag_PROBIT_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_PROBIT_D, targets_notMNIST, n_classes=10))
+        Diag_PROBIT_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_PROBIT_D, targets_KMNIST, n_classes=10))
+        
 
         
         #Probit KFAC
@@ -588,7 +667,11 @@ def main():
         KFAC_PROBIT_ECE_FMNIST.append(scoring.expected_calibration_error(targets_FMNIST, MNIST_test_out_FMNIST_PROBIT_K))
         KFAC_PROBIT_ECE_notMNIST.append(scoring.expected_calibration_error(targets_notMNIST, MNIST_test_out_notMNIST_PROBIT_K))
         KFAC_PROBIT_ECE_KMNIST.append(scoring.expected_calibration_error(targets_KMNIST, MNIST_test_out_KMNIST_PROBIT_K))
-
+        KFAC_PROBIT_Brier_in.append(get_brier(MNIST_test_in_PROBIT_K, targets, n_classes=10))
+        KFAC_PROBIT_Brier_FMNIST.append(get_brier(MNIST_test_out_FMNIST_PROBIT_K, targets_FMNIST, n_classes=10))
+        KFAC_PROBIT_Brier_notMNIST.append(get_brier(MNIST_test_out_notMNIST_PROBIT_K, targets_notMNIST, n_classes=10))
+        KFAC_PROBIT_Brier_KMNIST.append(get_brier(MNIST_test_out_KMNIST_PROBIT_K, targets_KMNIST, n_classes=10))
+        
         
         """
         #SODPP diag
@@ -648,6 +731,10 @@ def main():
         'MAP_ECE_FMNIST':MAP_ECE_FMNIST,
         'MAP_ECE_notMNIST':MAP_ECE_notMNIST,
         'MAP_ECE_KMNIST':MAP_ECE_KMNIST,
+        'MAP_Brier_in':MAP_Brier_in,
+        'MAP_Brier_FMNIST':MAP_Brier_FMNIST,
+        'MAP_Brier_notMNIST':MAP_Brier_notMNIST,
+        'MAP_Brier_KMNIST':MAP_Brier_KMNIST,
         'Diag_samples_MMC_in':Diag_samples_MMC_in,
         'Diag_samples_MMC_FMNIST':Diag_samples_MMC_FMNIST,
         'Diag_samples_MMC_notMNIST':Diag_samples_MMC_notMNIST,
@@ -663,6 +750,10 @@ def main():
         'Diag_samples_ECE_FMNIST':Diag_samples_ECE_FMNIST,
         'Diag_samples_ECE_notMNIST':Diag_samples_ECE_notMNIST,
         'Diag_samples_ECE_KMNIST':Diag_samples_ECE_KMNIST,
+        'Diag_samples_Brier_in':Diag_samples_Brier_in,
+        'Diag_samples_Brier_FMNIST':Diag_samples_Brier_FMNIST,
+        'Diag_samples_Brier_notMNIST':Diag_samples_Brier_notMNIST,
+        'Diag_samples_Brier_KMNIST':Diag_samples_Brier_KMNIST,
         'KFAC_samples_MMC_in':KFAC_samples_MMC_in,
         'KFAC_samples_MMC_FMNIST':KFAC_samples_MMC_FMNIST,
         'KFAC_samples_MMC_notMNIST':KFAC_samples_MMC_notMNIST,
@@ -678,6 +769,10 @@ def main():
         'KFAC_samples_ECE_FMNIST':KFAC_samples_ECE_FMNIST,
         'KFAC_samples_ECE_notMNIST':KFAC_samples_ECE_notMNIST,
         'KFAC_samples_ECE_KMNIST':KFAC_samples_ECE_KMNIST,
+        'KFAC_samples_Brier_in':KFAC_samples_Brier_in,
+        'KFAC_samples_Brier_FMNIST':KFAC_samples_Brier_FMNIST,
+        'KFAC_samples_Brier_notMNIST':KFAC_samples_Brier_notMNIST,
+        'KFAC_samples_Brier_KMNIST':KFAC_samples_Brier_KMNIST,
         'Diag_LB_MMC_in':Diag_LB_MMC_in,
         'Diag_LB_MMC_FMNIST':Diag_LB_MMC_FMNIST,
         'Diag_LB_MMC_notMNIST':Diag_LB_MMC_notMNIST,
@@ -693,6 +788,10 @@ def main():
         'Diag_LB_ECE_FMNIST':Diag_LB_ECE_FMNIST,
         'Diag_LB_ECE_notMNIST':Diag_LB_ECE_notMNIST,
         'Diag_LB_ECE_KMNIST':Diag_LB_ECE_KMNIST,
+        'Diag_LB_Brier_in':Diag_LB_Brier_in,
+        'Diag_LB_Brier_FMNIST':Diag_LB_Brier_FMNIST,
+        'Diag_LB_Brier_notMNIST':Diag_LB_Brier_notMNIST,
+        'Diag_LB_Brier_KMNIST':Diag_LB_Brier_KMNIST,
         'KFAC_LB_MMC_in':KFAC_LB_MMC_in,
         'KFAC_LB_MMC_FMNIST':KFAC_LB_MMC_FMNIST,
         'KFAC_LB_MMC_notMNIST':KFAC_LB_MMC_notMNIST,
@@ -708,6 +807,10 @@ def main():
         'KFAC_LB_ECE_FMNIST':KFAC_LB_ECE_FMNIST,
         'KFAC_LB_ECE_notMNIST':KFAC_LB_ECE_notMNIST,
         'KFAC_LB_ECE_KMNIST':KFAC_LB_ECE_KMNIST,
+        'KFAC_LB_Brier_in':KFAC_LB_Brier_in,
+        'KFAC_LB_Brier_FMNIST':KFAC_LB_Brier_FMNIST,
+        'KFAC_LB_Brier_notMNIST':KFAC_LB_Brier_notMNIST,
+        'KFAC_LB_Brier_KMNIST':KFAC_LB_Brier_KMNIST,
         'Diag_LB_norm_MMC_in':Diag_LB_norm_MMC_in,
         'Diag_LB_norm_MMC_FMNIST':Diag_LB_norm_MMC_FMNIST,
         'Diag_LB_norm_MMC_notMNIST':Diag_LB_norm_MMC_notMNIST,
@@ -723,6 +826,10 @@ def main():
         'Diag_LB_norm_ECE_FMNIST':Diag_LB_norm_ECE_FMNIST,
         'Diag_LB_norm_ECE_notMNIST':Diag_LB_norm_ECE_notMNIST,
         'Diag_LB_norm_ECE_KMNIST':Diag_LB_norm_ECE_KMNIST,
+        'Diag_LB_norm_Brier_in':Diag_LB_norm_Brier_in,
+        'Diag_LB_norm_Brier_FMNIST':Diag_LB_norm_Brier_FMNIST,
+        'Diag_LB_norm_Brier_notMNIST':Diag_LB_norm_Brier_notMNIST,
+        'Diag_LB_norm_Brier_KMNIST':Diag_LB_norm_Brier_KMNIST,
         'KFAC_LB_norm_MMC_in':KFAC_LB_norm_MMC_in,
         'KFAC_LB_norm_MMC_FMNIST':KFAC_LB_norm_MMC_FMNIST,
         'KFAC_LB_norm_MMC_notMNIST':KFAC_LB_norm_MMC_notMNIST,
@@ -738,6 +845,10 @@ def main():
         'KFAC_LB_norm_ECE_FMNIST':KFAC_LB_norm_ECE_FMNIST,
         'KFAC_LB_norm_ECE_notMNIST':KFAC_LB_norm_ECE_notMNIST,
         'KFAC_LB_norm_ECE_KMNIST':KFAC_LB_norm_ECE_KMNIST,
+        'KFAC_LB_norm_Brier_in':KFAC_LB_norm_Brier_in,
+        'KFAC_LB_norm_Brier_FMNIST':KFAC_LB_norm_Brier_FMNIST,
+        'KFAC_LB_norm_Brier_notMNIST':KFAC_LB_norm_Brier_notMNIST,
+        'KFAC_LB_norm_Brier_KMNIST':KFAC_LB_norm_Brier_KMNIST,
         'Diag_PROBIT_MMC_in':Diag_PROBIT_MMC_in,
         'Diag_PROBIT_MMC_FMNIST':Diag_PROBIT_MMC_FMNIST,
         'Diag_PROBIT_MMC_notMNIST':Diag_PROBIT_MMC_notMNIST,
@@ -753,6 +864,10 @@ def main():
         'Diag_PROBIT_ECE_FMNIST':Diag_PROBIT_ECE_FMNIST,
         'Diag_PROBIT_ECE_notMNIST':Diag_PROBIT_ECE_notMNIST,
         'Diag_PROBIT_ECE_KMNIST':Diag_PROBIT_ECE_KMNIST,
+        'Diag_PROBIT_Brier_in':Diag_PROBIT_Brier_in,
+        'Diag_PROBIT_Brier_FMNIST':Diag_PROBIT_Brier_FMNIST,
+        'Diag_PROBIT_Brier_notMNIST':Diag_PROBIT_Brier_notMNIST,
+        'Diag_PROBIT_Brier_KMNIST':Diag_PROBIT_Brier_KMNIST,
         'KFAC_PROBIT_MMC_in':KFAC_PROBIT_MMC_in,
         'KFAC_PROBIT_MMC_FMNIST':KFAC_PROBIT_MMC_FMNIST,
         'KFAC_PROBIT_MMC_notMNIST':KFAC_PROBIT_MMC_notMNIST,
@@ -768,6 +883,10 @@ def main():
         'KFAC_PROBIT_ECE_FMNIST':KFAC_PROBIT_ECE_FMNIST,
         'KFAC_PROBIT_ECE_notMNIST':KFAC_PROBIT_ECE_notMNIST,
         'KFAC_PROBIT_ECE_KMNIST':KFAC_PROBIT_ECE_KMNIST,
+        'KFAC_PROBIT_Brier_in':KFAC_PROBIT_Brier_in,
+        'KFAC_PROBIT_Brier_FMNIST':KFAC_PROBIT_Brier_FMNIST,
+        'KFAC_PROBIT_Brier_notMNIST':KFAC_PROBIT_Brier_notMNIST,
+        'KFAC_PROBIT_Brier_KMNIST':KFAC_PROBIT_Brier_KMNIST,
         #'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
         #'Diag_SODPP_MMC_FMNIST':Diag_SODPP_MMC_FMNIST,
         #'Diag_SODPP_MMC_notMNIST':Diag_SODPP_MMC_notMNIST,
@@ -784,7 +903,7 @@ def main():
         #'KFAC_SODPP_AUROC_KMNIST':KFAC_SODPP_AUROC_KMNIST
     }
     results_df = pd.DataFrame(results_dict)
-    RESULTS_PATH = os.getcwd() + "/Experiment_results/MNIST_results.csv"
+    RESULTS_PATH = os.getcwd() + "/Experiment_results/MNIST_results{}.csv".format("_all_layers" if not args.last_layer else "")
     print("saving at: ", RESULTS_PATH)
     results_df.to_csv(RESULTS_PATH)
 

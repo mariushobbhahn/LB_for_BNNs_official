@@ -2,6 +2,7 @@ import torch
 import torchvision
 from torch.distributions.multivariate_normal import MultivariateNormal
 import numpy as np
+import torch.nn.functional as F
 from backpack import backpack, extend
 from backpack.extensions import KFAC, DiagHessian, DiagGGNMC
 from sklearn.metrics import roc_auc_score
@@ -146,6 +147,15 @@ def get_fpr95(py_in, py_out):
     fp = np.sum(conf_out >=  perc)
     fpr = np.sum(conf_out >=  perc)/len(conf_out)
     return fpr, perc
+
+def get_one_hot(targets, nb_classes):
+    res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
+    return res.reshape(list(targets.shape)+[nb_classes])
+
+def get_brier(py, target, n_classes=10):
+    preds = torch.tensor(py).float()
+    target_onehot = torch.tensor(get_one_hot(target, n_classes)).float()
+    return F.mse_loss(preds, target_onehot).item()
 
 
 def get_in_dist_values(py_in, targets):

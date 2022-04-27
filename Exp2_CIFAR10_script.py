@@ -74,7 +74,7 @@ def main():
     CIFAR10_model.load_state_dict(torch.load(CIFAR10_PATH))
     CIFAR10_model.eval()
     
-    targets_CIFAR10 = CIFAR10_testset.targets
+    targets_CIFAR10 = np.array(CIFAR10_testset.targets)
     targets_CIFAR100 = torch.tensor(CIFAR100_test.targets).clip(0, 9).numpy()
     targets_SVHN = []
     for x,y in SVHN_test_loader:
@@ -97,6 +97,9 @@ def main():
     MAP_ECE_in = []
     MAP_ECE_CIFAR100 = []
     MAP_ECE_SVHN = []
+    MAP_Brier_in = []
+    MAP_Brier_CIFAR100 = []
+    MAP_Brier_SVHN = []
     
     # Diag samples
     Diag_samples_MMC_in = []
@@ -110,6 +113,9 @@ def main():
     Diag_samples_ECE_in = []
     Diag_samples_ECE_CIFAR100 = []
     Diag_samples_ECE_SVHN = []
+    Diag_samples_Brier_in = []
+    Diag_samples_Brier_CIFAR100 = []
+    Diag_samples_Brier_SVHN = []
 
     # KFAC samples
     KFAC_samples_MMC_in = []
@@ -123,6 +129,9 @@ def main():
     KFAC_samples_ECE_in = []
     KFAC_samples_ECE_CIFAR100 = []
     KFAC_samples_ECE_SVHN = []
+    KFAC_samples_Brier_in = []
+    KFAC_samples_Brier_CIFAR100 = []
+    KFAC_samples_Brier_SVHN = []
 
     # Diag LB
     Diag_LB_MMC_in = []
@@ -136,6 +145,9 @@ def main():
     Diag_LB_ECE_in = []
     Diag_LB_ECE_CIFAR100 = []
     Diag_LB_ECE_SVHN = []
+    Diag_LB_Brier_in = []
+    Diag_LB_Brier_CIFAR100 = []
+    Diag_LB_Brier_SVHN = []
     
     # KFAC LB
     KFAC_LB_MMC_in = []
@@ -149,6 +161,9 @@ def main():
     KFAC_LB_ECE_in = []
     KFAC_LB_ECE_CIFAR100 = []
     KFAC_LB_ECE_SVHN = []
+    KFAC_LB_Brier_in = []
+    KFAC_LB_Brier_CIFAR100 = []
+    KFAC_LB_Brier_SVHN = []
 
     # Diag LB normalized
     Diag_LB_norm_MMC_in = []
@@ -162,6 +177,9 @@ def main():
     Diag_LB_norm_ECE_in = []
     Diag_LB_norm_ECE_CIFAR100 = []
     Diag_LB_norm_ECE_SVHN = []
+    Diag_LB_norm_Brier_in = []
+    Diag_LB_norm_Brier_CIFAR100 = []
+    Diag_LB_norm_Brier_SVHN = []
     
     # KFAC LB normalized
     KFAC_LB_norm_MMC_in = []
@@ -175,6 +193,9 @@ def main():
     KFAC_LB_norm_ECE_in = []
     KFAC_LB_norm_ECE_CIFAR100 = []
     KFAC_LB_norm_ECE_SVHN = []
+    KFAC_LB_norm_Brier_in = []
+    KFAC_LB_norm_Brier_CIFAR100 = []
+    KFAC_LB_norm_Brier_SVHN = []
     
     # Diag PROBIT
     Diag_PROBIT_MMC_in = []
@@ -188,6 +209,9 @@ def main():
     Diag_PROBIT_ECE_in = []
     Diag_PROBIT_ECE_CIFAR100 = []
     Diag_PROBIT_ECE_SVHN = []
+    Diag_PROBIT_Brier_in = []
+    Diag_PROBIT_Brier_CIFAR100 = []
+    Diag_PROBIT_Brier_SVHN = []
     
     # KFAC PROBIT
     KFAC_PROBIT_MMC_in = []
@@ -201,6 +225,9 @@ def main():
     KFAC_PROBIT_ECE_in = []
     KFAC_PROBIT_ECE_CIFAR100 = []
     KFAC_PROBIT_ECE_SVHN = []
+    KFAC_PROBIT_Brier_in = []
+    KFAC_PROBIT_Brier_CIFAR100 = []
+    KFAC_PROBIT_Brier_SVHN = []
     
     """
     # Diag SODPP
@@ -261,6 +288,9 @@ def main():
         MAP_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_MAP))
         MAP_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_MAP))
         MAP_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_MAP))
+        MAP_Brier_in.append(get_brier(CIFAR10_test_in_MAP, targets_CIFAR10, n_classes=10))
+        MAP_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_MAP, targets_CIFAR100, n_classes=10))
+        MAP_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_MAP, targets_SVHN, n_classes=10))
 
 
         #Diag samples
@@ -283,6 +313,9 @@ def main():
         Diag_samples_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_D))
         Diag_samples_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_D))
         Diag_samples_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_D))
+        Diag_samples_Brier_in.append(get_brier(CIFAR10_test_in_D, targets_CIFAR10, n_classes=10))
+        Diag_samples_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_D, targets_CIFAR100, n_classes=10))
+        Diag_samples_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_D, targets_SVHN, n_classes=10))
 
         
         #KFAC samples
@@ -306,7 +339,10 @@ def main():
         KFAC_samples_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_KFAC))
         KFAC_samples_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_KFAC))
         KFAC_samples_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_KFAC))
-
+        KFAC_samples_Brier_in.append(get_brier(CIFAR10_test_in_KFAC, targets_CIFAR10, n_classes=10))
+        KFAC_samples_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_KFAC, targets_CIFAR100, n_classes=10))
+        KFAC_samples_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_KFAC, targets_SVHN, n_classes=10))
+        
         
         #LB diag
         CIFAR10_test_in_LB_D = predict_LB(la_diag, CIFAR10_test_loader, timing=False, device=device).cpu().numpy()
@@ -328,6 +364,10 @@ def main():
         Diag_LB_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_D))
         Diag_LB_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_D))
         Diag_LB_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_D))
+        Diag_LB_Brier_in.append(get_brier(CIFAR10_test_in_LB_D, targets_CIFAR10, n_classes=10))
+        Diag_LB_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_LB_D, targets_CIFAR100, n_classes=10))
+        Diag_LB_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_LB_D, targets_SVHN, n_classes=10))
+        
 
         
         #LB KFAC
@@ -350,6 +390,10 @@ def main():
         KFAC_LB_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_KFAC))
         KFAC_LB_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_KFAC))
         KFAC_LB_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_KFAC))
+        KFAC_LB_Brier_in.append(get_brier(CIFAR10_test_in_LB_KFAC, targets_CIFAR10, n_classes=10))
+        KFAC_LB_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_LB_KFAC, targets_CIFAR100, n_classes=10))
+        KFAC_LB_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_LB_KFAC, targets_SVHN, n_classes=10))
+        
 
 
         #LB diag normalized
@@ -372,6 +416,10 @@ def main():
         Diag_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_Dn))
         Diag_LB_norm_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_Dn))
         Diag_LB_norm_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_Dn))
+        Diag_LB_norm_Brier_in.append(get_brier(CIFAR10_test_in_LB_Dn, targets_CIFAR10, n_classes=10))
+        Diag_LB_norm_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_LB_Dn, targets_CIFAR100, n_classes=10))
+        Diag_LB_norm_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_LB_Dn, targets_SVHN, n_classes=10))
+        
        
 
         #LB KFAC normalized
@@ -394,6 +442,10 @@ def main():
         KFAC_LB_norm_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_LB_KFACn))
         KFAC_LB_norm_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_LB_KFACn))
         KFAC_LB_norm_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_LB_KFACn))
+        KFAC_LB_norm_Brier_in.append(get_brier(CIFAR10_test_in_LB_KFAC, targets_CIFAR10, n_classes=10))
+        KFAC_LB_norm_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_LB_KFAC, targets_CIFAR100, n_classes=10))
+        KFAC_LB_norm_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_LB_KFAC, targets_SVHN, n_classes=10))
+        
 
 
         #Extended MacKay diag
@@ -416,6 +468,9 @@ def main():
         Diag_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_PROBIT_D))
         Diag_PROBIT_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_PROBIT_D))
         Diag_PROBIT_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_PROBIT_D))
+        Diag_PROBIT_Brier_in.append(get_brier(CIFAR10_test_in_PROBIT_D, targets_CIFAR10, n_classes=10))
+        Diag_PROBIT_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_PROBIT_D, targets_CIFAR100, n_classes=10))
+        Diag_PROBIT_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_PROBIT_D, targets_SVHN, n_classes=10))
 
         
         #Extended MacKay KFAC
@@ -438,6 +493,10 @@ def main():
         KFAC_PROBIT_ECE_in.append(scoring.expected_calibration_error(targets_CIFAR10, CIFAR10_test_in_PROBIT_K))
         KFAC_PROBIT_ECE_CIFAR100.append(scoring.expected_calibration_error(targets_CIFAR100, CIFAR10_test_out_CIFAR100_PROBIT_K))
         KFAC_PROBIT_ECE_SVHN.append(scoring.expected_calibration_error(targets_SVHN, CIFAR10_test_out_SVHN_PROBIT_K))
+        KFAC_PROBIT_Brier_in.append(get_brier(CIFAR10_test_in_PROBIT_K, targets_CIFAR10, n_classes=10))
+        KFAC_PROBIT_Brier_CIFAR100.append(get_brier(CIFAR10_test_out_CIFAR100_PROBIT_K, targets_CIFAR100, n_classes=10))
+        KFAC_PROBIT_Brier_SVHN.append(get_brier(CIFAR10_test_out_SVHN_PROBIT_K, targets_SVHN, n_classes=10))
+        
 
         
         """
@@ -485,6 +544,9 @@ def main():
         'MAP_ECE_in':MAP_ECE_in,
         'MAP_ECE_CIFAR100':MAP_ECE_CIFAR100,
         'MAP_ECE_SVHN':MAP_ECE_SVHN,
+        'MAP_Brier_in':MAP_Brier_in,
+        'MAP_Brier_CIFAR100':MAP_Brier_CIFAR100,
+        'MAP_Brier_SVHN':MAP_Brier_SVHN,
         'Diag_samples_MMC_in':Diag_samples_MMC_in,
         'Diag_samples_MMC_CIFAR100':Diag_samples_MMC_CIFAR100,
         'Diag_samples_MMC_SVHN':Diag_samples_MMC_SVHN,
@@ -496,6 +558,9 @@ def main():
         'Diag_samples_ECE_in':Diag_samples_ECE_in,
         'Diag_samples_ECE_CIFAR100':Diag_samples_ECE_CIFAR100,
         'Diag_samples_ECE_SVHN':Diag_samples_ECE_SVHN,
+        'Diag_samples_Brier_in':Diag_samples_Brier_in,
+        'Diag_samples_Brier_CIFAR100':Diag_samples_Brier_CIFAR100,
+        'Diag_samples_Brier_SVHN':Diag_samples_Brier_SVHN,
         'KFAC_samples_MMC_in':KFAC_samples_MMC_in,
         'KFAC_samples_MMC_CIFAR100':KFAC_samples_MMC_CIFAR100,
         'KFAC_samples_MMC_SVHN':KFAC_samples_MMC_SVHN,
@@ -507,6 +572,9 @@ def main():
         'KFAC_samples_ECE_in':KFAC_samples_ECE_in,
         'KFAC_samples_ECE_CIFAR100':KFAC_samples_ECE_CIFAR100,
         'KFAC_samples_ECE_SVHN':KFAC_samples_ECE_SVHN,
+        'KFAC_samples_Brier_in':KFAC_samples_Brier_in,
+        'KFAC_samples_Brier_CIFAR100':KFAC_samples_Brier_CIFAR100,
+        'KFAC_samples_Brier_SVHN':KFAC_samples_Brier_SVHN,
         'Diag_LB_MMC_in':Diag_LB_MMC_in,
         'Diag_LB_MMC_CIFAR100':Diag_LB_MMC_CIFAR100,
         'Diag_LB_MMC_SVHN':Diag_LB_MMC_SVHN,
@@ -518,6 +586,9 @@ def main():
         'Diag_LB_ECE_in':Diag_LB_ECE_in,
         'Diag_LB_ECE_CIFAR100':Diag_LB_ECE_CIFAR100,
         'Diag_LB_ECE_SVHN':Diag_LB_ECE_SVHN,
+        'Diag_LB_Brier_in':Diag_LB_Brier_in,
+        'Diag_LB_Brier_CIFAR100':Diag_LB_Brier_CIFAR100,
+        'Diag_LB_Brier_SVHN':Diag_LB_Brier_SVHN,
         'KFAC_LB_MMC_in':KFAC_LB_MMC_in,
         'KFAC_LB_MMC_CIFAR100':KFAC_LB_MMC_CIFAR100,
         'KFAC_LB_MMC_SVHN':KFAC_LB_MMC_SVHN,
@@ -529,6 +600,9 @@ def main():
         'KFAC_LB_ECE_in':KFAC_LB_ECE_in,
         'KFAC_LB_ECE_CIFAR100':KFAC_LB_ECE_CIFAR100,
         'KFAC_LB_ECE_SVHN':KFAC_LB_ECE_SVHN,
+        'KFAC_LB_Brier_in':KFAC_LB_Brier_in,
+        'KFAC_LB_Brier_CIFAR100':KFAC_LB_Brier_CIFAR100,
+        'KFAC_LB_Brier_SVHN':KFAC_LB_Brier_SVHN,
         'Diag_LB_norm_MMC_in':Diag_LB_norm_MMC_in,
         'Diag_LB_norm_MMC_CIFAR100':Diag_LB_norm_MMC_CIFAR100,
         'Diag_LB_norm_MMC_SVHN':Diag_LB_norm_MMC_SVHN,
@@ -540,6 +614,9 @@ def main():
         'Diag_LB_norm_ECE_in':Diag_LB_norm_ECE_in,
         'Diag_LB_norm_ECE_CIFAR100':Diag_LB_norm_ECE_CIFAR100,
         'Diag_LB_norm_ECE_SVHN':Diag_LB_norm_ECE_SVHN,
+        'Diag_LB_norm_Brier_in':Diag_LB_norm_Brier_in,
+        'Diag_LB_norm_Brier_CIFAR100':Diag_LB_norm_Brier_CIFAR100,
+        'Diag_LB_norm_Brier_SVHN':Diag_LB_norm_Brier_SVHN,
         'KFAC_LB_norm_MMC_in':KFAC_LB_norm_MMC_in,
         'KFAC_LB_norm_MMC_CIFAR100':KFAC_LB_norm_MMC_CIFAR100,
         'KFAC_LB_norm_MMC_SVHN':KFAC_LB_norm_MMC_SVHN,
@@ -551,6 +628,9 @@ def main():
         'KFAC_LB_norm_ECE_in':KFAC_LB_norm_ECE_in,
         'KFAC_LB_norm_ECE_CIFAR100':KFAC_LB_norm_ECE_CIFAR100,
         'KFAC_LB_norm_ECE_SVHN':KFAC_LB_norm_ECE_SVHN,
+        'KFAC_LB_norm_Brier_in':KFAC_LB_norm_Brier_in,
+        'KFAC_LB_norm_Brier_CIFAR100':KFAC_LB_norm_Brier_CIFAR100,
+        'KFAC_LB_norm_Brier_SVHN':KFAC_LB_norm_Brier_SVHN,
         'Diag_PROBIT_MMC_in':Diag_PROBIT_MMC_in,
         'Diag_PROBIT_MMC_CIFAR100':Diag_PROBIT_MMC_CIFAR100,
         'Diag_PROBIT_MMC_SVHN':Diag_PROBIT_MMC_SVHN,
@@ -562,6 +642,9 @@ def main():
         'Diag_PROBIT_ECE_in':Diag_PROBIT_ECE_in,
         'Diag_PROBIT_ECE_CIFAR100':Diag_PROBIT_ECE_CIFAR100,
         'Diag_PROBIT_ECE_SVHN':Diag_PROBIT_ECE_SVHN,
+        'Diag_PROBIT_Brier_in':Diag_PROBIT_Brier_in,
+        'Diag_PROBIT_Brier_CIFAR100':Diag_PROBIT_Brier_CIFAR100,
+        'Diag_PROBIT_Brier_SVHN':Diag_PROBIT_Brier_SVHN,
         'KFAC_PROBIT_MMC_in':KFAC_PROBIT_MMC_in,
         'KFAC_PROBIT_MMC_CIFAR100':KFAC_PROBIT_MMC_CIFAR100,
         'KFAC_PROBIT_MMC_SVHN':KFAC_PROBIT_MMC_SVHN,
@@ -573,6 +656,9 @@ def main():
         'KFAC_PROBIT_ECE_in':KFAC_PROBIT_ECE_in,
         'KFAC_PROBIT_ECE_CIFAR100':KFAC_PROBIT_ECE_CIFAR100,
         'KFAC_PROBIT_ECE_SVHN':KFAC_PROBIT_ECE_SVHN,
+        'KFAC_PROBIT_Brier_in':KFAC_PROBIT_Brier_in,
+        'KFAC_PROBIT_Brier_CIFAR100':KFAC_PROBIT_Brier_CIFAR100,
+        'KFAC_PROBIT_Brier_SVHN':KFAC_PROBIT_Brier_SVHN,
         #'Diag_SODPP_MMC_in':Diag_SODPP_MMC_in,
         #'Diag_SODPP_MMC_CIFAR100':Diag_SODPP_MMC_CIFAR100,
         #'Diag_SODPP_MMC_SVHN':Diag_SODPP_MMC_SVHN,
